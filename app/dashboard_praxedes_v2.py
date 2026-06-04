@@ -35,7 +35,7 @@ BASE_DIR    = (
     else _SCRIPT_DIR
 )
 DB_PATH    = os.path.join(BASE_DIR, "data", "hr_analytics.db")
-CHROMA_DIR = os.path.join(BASE_DIR, "chroma_db")
+CHROMA_DIR = BASE_DIR
 
 sys.path.insert(0, _SCRIPT_DIR)
 from rls import rls_intercept, ROLES, DEPT_NAMES
