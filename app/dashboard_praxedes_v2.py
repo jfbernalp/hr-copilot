@@ -24,7 +24,6 @@ import google.genai as genai
 import dash
 from dash import dcc, html, Input, Output, State, callback_context
 from dotenv import load_dotenv
-from vanna.legacy.chromadb.chromadb_vector import ChromaDB_VectorStore
 from vanna.legacy.base.base import VannaBase
 
 # ── Paths & Config ─────────────────────────────────────────────────────────────
@@ -38,7 +37,9 @@ DB_PATH    = os.path.join(BASE_DIR, "data", "hr_analytics.db")
 CHROMA_DIR = BASE_DIR
 
 sys.path.insert(0, _SCRIPT_DIR)
+sys.path.insert(0, BASE_DIR)
 from rls import rls_intercept, ROLES, DEPT_NAMES
+from setup.train_vanna import DDL, DOCUMENTATION, KPI_DOCUMENTATION, VISUALIZATION_DOCUMENTATION, EXAMPLES, KPI_EXAMPLES
 
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -51,9 +52,8 @@ COST_OUTPUT_PER_1M = 0.30
 
 
 # ── Vanna + Gemini ─────────────────────────────────────────────────────────────
-class HRCopilot(ChromaDB_VectorStore, VannaBase):
+class HRCopilot(VannaBase):
     def __init__(self, config=None):
-        ChromaDB_VectorStore.__init__(self, config=config)
         VannaBase.__init__(self, config=config)
         self._client    = genai.Client(api_key=config.get("api_key"))
         self.model_name = config.get("model", "gemini-2.5-flash")
@@ -62,6 +62,16 @@ class HRCopilot(ChromaDB_VectorStore, VannaBase):
     def system_message(self, message): return message
     def user_message(self, message):   return message
     def assistant_message(self, message): return message
+
+    def generate_embedding(self, data, **kwargs): return [0.0]
+    def get_related_ddl(self, question, **kwargs): return [DDL]
+    def get_related_documentation(self, question, **kwargs): return [DOCUMENTATION, KPI_DOCUMENTATION, VISUALIZATION_DOCUMENTATION]
+    def get_similar_question_sql(self, question, **kwargs): return EXAMPLES + KPI_EXAMPLES
+    def add_ddl(self, ddl, **kwargs): pass
+    def add_documentation(self, documentation, **kwargs): pass
+    def add_question_sql(self, question, sql, **kwargs): pass
+    def remove_training_data(self, id, **kwargs): pass
+    def get_training_data(self, **kwargs): return pd.DataFrame()
 
     def submit_prompt(self, prompt, **kwargs):
         text = (
