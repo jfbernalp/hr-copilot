@@ -21,3 +21,4 @@ htmlcov/
 # Bases de datos y almacenamiento (Opcional, según diseño)
 # chroma.sqlite3 # <- Descomentar si no quieres subir la DB local
 # /data/ # <- Descomentar si tienes datos privados
+*.pdf
