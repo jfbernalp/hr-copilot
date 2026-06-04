@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Copilot - Práxedes S.A.S.</title>
+    <!-- Fuente Montserrat de Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Variables de colores y estilos basados en el manual */
+        :root {
+            --naranjado: #ff8b00;
+            --naranjado-dark: #cc6f00;
+            --naranjado-light: #fff3e0;
+            --gris-oscuro: #383838;
+            --gris-claro: #dddddd;
+            --gris-bg: #f5f5f5;
+            --blanco: #ffffff;
+            --font-family: 'Montserrat', sans-serif;
+            --radius: 25px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--gris-bg);
+            color: var(--gris-oscuro);
+            overflow: hidden; /* Evitar scroll en la presentación */
+        }
+
+        /* Contenedor Principal de la Presentación */
+        .presentation-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+        }
+
+        /* Diapositivas */
+        .slide {
+            width: 100%;
+            max-width: 1200px;
+            height: 100%;
+            max-height: 800px;
+            background-color: var(--blanco);
+            border-radius: var(--radius);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.95);
+            opacity: 0;
+            transition: all 0.6s cubic-bezier(0.25, 0.8, 0.25, 1);
+            visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border-top: 8px solid var(--naranjado);
+        }
+
+        .slide.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, -50%) scale(1);
+            z-index: 10;
+        }
+
+        /* Elementos Decorativos */
+        .shape-circle {
+            position: absolute;
+            border-radius: 50%;
+            z-index: 0;
+        }
+        
+        .shape-1 {
+            width: 300px; height: 300px;
+            background-color: var(--naranjado);
+            top: -100px; right: -100px;
+            opacity: 0.1;
+        }
+        
+        .shape-2 {
+            width: 150px; height: 150px;
+            background-color: var(--gris-claro);
+            bottom: -50px; left: 10%;
+            opacity: 0.3;
+        }
+
+        /* Contenido del Slide */
+        .slide-content {
+            flex: 1;
+            padding: 60px 80px;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .slide-header {
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-weight: 900;
+            font-size: 54px;
+            color: var(--gris-oscuro);
+            line-height: 1.1;
+            margin-bottom: 15px;
+            letter-spacing: -1px;
+        }
+
+        h1 span {
+            color: var(--naranjado);
+        }
+
+        h2 {
+            font-weight: 700;
+            font-size: 40px;
+            color: var(--naranjado);
+            margin-bottom: 20px;
+        }
+
+        h3 {
+            font-weight: 700;
+            font-size: 24px;
+            color: var(--gris-oscuro);
+            margin-bottom: 15px;
+        }
+
+        p {
+            font-weight: 400;
+            font-size: 20px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            color: #555;
+        }
+
+        .bullet-list {
+            list-style: none;
+            margin-top: 20px;
+        }
+
+        .bullet-list li {
+            font-size: 20px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .bullet-list li::before {
+            content: '';
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background-color: var(--naranjado);
+            border-radius: 50%;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        /* Separador */
+        .separator {
+            width: 60px;
+            height: 6px;
+            background-color: var(--naranjado);
+            border-radius: 3px;
+            margin-bottom: 30px;
+        }
+
+        .separator-gray {
+            width: 100%;
+            height: 3px;
+            background-color: var(--gris-claro);
+            border-radius: 3px;
+            margin: 30px 0;
+        }
+
+        /* Grillas y Layouts */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            flex: 1;
+        }
+
+        /* Tarjetas (Contenedores menores) */
+        .card {
+            background-color: var(--gris-bg);
+            border-radius: var(--radius);
+            padding: 20px;
+            border: 2px solid var(--gris-claro);
+            transition: transform 0.3s, border-color 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: var(--naranjado);
+            background-color: var(--naranjado-light);
+        }
+
+        /* Controles de Navegación */
+        .controls {
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+        }
+
+        .btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: var(--gris-oscuro);
+            color: var(--blanco);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: 700;
+            transition: all 0.3s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        .btn:hover {
+            background-color: var(--naranjado);
+            transform: scale(1.05);
+        }
+
+        .btn:disabled {
+            background-color: var(--gris-claro);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Indicador de progreso */
+        .progress-container {
+            position: absolute;
+            bottom: 40px;
+            left: 40px;
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .progress-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--gris-claro);
+            transition: background-color 0.3s;
+            cursor: pointer;
+        }
+
+        .progress-dot.active {
+            background-color: var(--naranjado);
+            width: 30px;
+            border-radius: 6px;
+        }
+
+        /* Diagrama Flex */
+        .flow-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: var(--gris-bg);
+            padding: 30px;
+            border-radius: var(--radius);
+            margin-top: 20px;
+        }
+
+        .flow-step {
+            text-align: center;
+            flex: 1;
+        }
+
+        .flow-icon {
+            width: 70px;
+            height: 70px;
+            background-color: var(--blanco);
+            border: 3px solid var(--naranjado);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 15px;
+            font-size: 28px;
+            font-weight: 900;
+            color: var(--naranjado);
+        }
+        
+        .flow-arrow {
+            color: var(--gris-claro);
+            font-size: 30px;
+            font-weight: 900;
+        }
+
+        /* Highlight box */
+        .highlight-box {
+            background-color: var(--naranjado);
+            color: var(--blanco);
+            padding: 40px;
+            border-radius: var(--radius);
+            margin-top: 20px;
+        }
+        .highlight-box h3 {
+            color: var(--blanco);
+        }
+        .highlight-box p {
+            color: var(--naranjado-light);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="presentation-container">
+        
+        <!-- Controles globales -->
+        <div class="progress-container" id="progress"></div>
+        <div class="controls">
+            <button class="btn" id="btn-prev" onclick="prevSlide()">&#10094;</button>
+            <button class="btn" id="btn-next" onclick="nextSlide()">&#10095;</button>
+        </div>
+
+        <!-- SLIDE 1: Portada -->
+        <div class="slide active">
+            <div class="shape-circle shape-1"></div>
+            <div class="shape-circle shape-2"></div>
+            <div class="slide-content" style="justify-content: center; text-align: center;">
+                <h1 style="font-size: 80px; margin-bottom: 20px;">práxedes</h1>
+                <div style="width: 100px; height: 8px; background-color: var(--naranjado); margin: 0 auto 40px; border-radius: 4px;"></div>
+                <h2 style="font-size: 60px; color: var(--gris-oscuro);">HR <span>Copilot</span></h2>
+                <p style="font-size: 28px; color: var(--naranjado); font-weight: 600;">Analítica de Datos con IA Generativa</p>
+                <p style="margin-top: 40px; font-size: 16px; color: var(--gris-claro);">Explicación del Flujo de Trabajo y Funcionalidad</p>
+            </div>
+        </div>
+
+        <!-- SLIDE 2: ¿Qué es? -->
+        <div class="slide">
+            <div class="shape-circle shape-1"></div>
+            <div class="slide-content">
+                <div class="slide-header">
+                    <h2>¿Qué es HR Copilot?</h2>
+                    <div class="separator"></div>
+                </div>
+                <div class="grid-2">
+                    <div>
+                        <p><strong>HR Copilot</strong> transforma la manera en que los líderes de Práxedes interactúan con los datos de talento humano.</p>
+                        <p>En lugar de depender de analistas para construir dashboards estáticos, los gerentes pueden consultar a la base de datos utilizando <strong>lenguaje natural</strong>.</p>
+                        <ul class="bullet-list">
+                            <li>Autonomía inmediata (Self-service).</li>
+                            <li>Gráficos generados dinámicamente.</li>
+                            <li>Control estricto de seguridad de la información.</li>
+                        </ul>
+                    </div>
+                    <div class="highlight-box">
+                        <h3>Del Texto al Gráfico</h3>
+                        <p>El usuario pregunta:<br><em>"¿Cuál es la rotación de personal en el equipo de ventas este año?"</em></p>
+                        <br>
+                        <p>La IA comprende, traduce a SQL, extrae los datos y dibuja el gráfico ideal de manera automática, respetando la gobernanza de datos.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 3: Componentes Clave -->
+        <div class="slide">
+            <div class="slide-content">
+                <div class="slide-header">
+                    <h2>Arquitectura y Componentes</h2>
+                    <div class="separator"></div>
+                </div>
+                <p>Un sistema robusto compuesto por tecnologías líderes en el mercado:</p>
+                
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 30px;">
+                    <div class="card">
+                        <h3>UI & Dash</h3>
+                        <p>Aplicación web interactiva. Maneja la sesión del usuario, captura las preguntas y renderiza los componentes visuales con estilo corporativo.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Vanna AI (RAG)</h3>
+                        <p>Base de datos vectorial (ChromaDB) que almacena la estructura de las tablas (DDL) y enseña a la IA cómo hacer consultas precisas.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Gemini (LLM)</h3>
+                        <p>El cerebro traductor. Interpreta el lenguaje natural, genera el código SQL y también crea el código para las visualizaciones.</p>
+                    </div>
+                    <div class="card">
+                        <h3>SQLite (DB)</h3>
+                        <p>La base de datos estructurada donde reside de forma segura la información de los colaboradores.</p>
+                    </div>
+                    <div class="card">
+                        <h3 style="color: var(--naranjado);">Interceptor RLS</h3>
+                        <p>La capa de seguridad (Row-Level Security). Controla qué datos puede ver el usuario según su rol antes de ejecutar el SQL.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Plotly</h3>
+                        <p>Librería de gráficos interactivos, configurada estrictamente con los colores y formas de Práxedes S.A.S.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 4: El Motor de IA -->
+        <div class="slide">
+            <div class="shape-circle shape-2"></div>
+            <div class="slide-content">
+                <div class="slide-header">
+                    <h2>Fase 1: Text-to-SQL (Vanna + Gemini)</h2>
+                    <div class="separator"></div>
+                </div>
+                <div class="grid-2">
+                    <div>
+                        <p>¿Cómo aseguramos que la IA no invente columnas o tablas?</p>
+                        <p>Utilizamos <strong>RAG (Retrieval-Augmented Generation)</strong> a través de Vanna AI. Cuando el usuario hace una pregunta, Vanna busca en su ChromaDB local el contexto relevante.</p>
+                        <p>Gemini recibe un <em>prompt</em> hiper-especializado que contiene la pregunta del usuario + el esquema exacto de nuestra base de datos, garantizando <strong>99% de precisión</strong> en la sintaxis SQL.</p>
+                    </div>
+                    <div class="card" style="background-color: var(--gris-oscuro); color: var(--blanco); border-color: var(--gris-oscuro);">
+                        <h3 style="color: var(--naranjado);">El Proceso Invisible</h3>
+                        <ul class="bullet-list" style="color: var(--blanco);">
+                            <li><span style="color:var(--gris-claro)">1.</span> Usuario: "¿Salarios promedio?"</li>
+                            <li><span style="color:var(--gris-claro)">2.</span> Vanna busca DDL de tabla "employees".</li>
+                            <li><span style="color:var(--gris-claro)">3.</span> Vanna envía contexto a Gemini.</li>
+                            <li><span style="color:var(--gris-claro)">4.</span> Gemini responde: <br><code style="color:var(--naranjado); font-size: 16px;">SELECT AVG(MonthlyIncome) FROM employees</code></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 5: Seguridad Interceptor -->
+        <div class="slide">
+            <div class="slide-content">
+                <div class="slide-header">
+                    <h2 style="color: var(--gris-oscuro);">Fase 2: <span style="color: var(--naranjado);">Seguridad e Interceptor (RLS)</span></h2>
+                    <div class="separator"></div>
+                </div>
+                <p>El núcleo de la gobernanza de datos. Antes de que el SQL generado por Gemini llegue a la base de datos, pasa por <code>rls.py</code>.</p>
+                
+                <div class="grid-2" style="margin-top: 30px;">
+                    <div class="card" style="border-left: 8px solid var(--naranjado);">
+                        <h3>Bloqueo de Columnas Sensibles</h3>
+                        <p>Si el usuario es "Employee Viewer", el interceptor escanea el SQL buscando columnas como <em>MonthlyIncome</em>.</p>
+                        <p style="color: #c0392b; font-weight: 700;">ACCESO DENEGADO</p>
+                        <p style="font-size: 14px;">El SQL se detiene y se registra en auditoría.</p>
+                    </div>
+                    <div class="card" style="border-left: 8px solid var(--gris-oscuro);">
+                        <h3>Inyección de Filtros (Row-Level Security)</h3>
+                        <p>Si el usuario es "Sales Manager", el interceptor reescribe el SQL dinámicamente.</p>
+                        <p style="background: var(--gris-bg); padding: 10px; border-radius: 8px; font-family: monospace; font-size: 14px;">
+                            ... <strong style="color: var(--naranjado);">WHERE e.department_id = 1</strong>
+                        </p>
+                        <p style="font-size: 14px; margin-top:10px;">Solo verá datos de Ventas.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 6: Visualización -->
+        <div class="slide">
+            <div class="shape-circle shape-1" style="left: -100px; right: auto;"></div>
+            <div class="slide-content">
+                <div class="slide-header">
+                    <h2>Fase 3: Visualización Dinámica</h2>
+                    <div class="separator"></div>
+                </div>
+                <p>Una vez que la base de datos retorna un DataFrame válido, el sistema debe graficarlo. ¿Cómo mantenemos el diseño de Práxedes?</p>
+                <div class="separator-gray"></div>
+                <div class="grid-2">
+                    <div>
+                        <h3>Plotly + Gemini</h3>
+                        <p>Se envía una muestra de los datos y un estricto manual de reglas visuales a Gemini (<em>PLOTLY_PROMPT</em>).</p>
+                        <p>Gemini escribe el código Python para generar el gráfico utilizando <strong>solo</strong> la paleta corporativa: Naranja, Blanco y Grises.</p>
+                    </div>
+                    <div>
+                        <h3>Fallback Inteligente (smart_chart)</h3>
+                        <p>Si la IA falla al generar el gráfico, la app tiene un motor de reglas interno que dibuja automáticamente el gráfico perfecto (Dona para porcentajes, Barras para categorías, KPIs para valores únicos).</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 7: Flujo Completo -->
+        <div class="slide">
+            <div class="slide-content">
+                <div class="slide-header">
+                    <h2>Resumen del Flujo</h2>
+                    <div class="separator"></div>
+                </div>
+                
+                <div class="flow-container">
+                    <div class="flow-step">
+                        <div class="flow-icon">1</div>
+                        <h3>Usuario</h3>
+                        <p style="font-size: 14px;">Hace pregunta en interfaz Dash.</p>
+                    </div>
+                    <div class="flow-arrow">&#8594;</div>
+                    <div class="flow-step">
+                        <div class="flow-icon">2</div>
+                        <h3>Vanna+IA</h3>
+                        <p style="font-size: 14px;">Traduce texto a SQL puro.</p>
+                    </div>
+                    <div class="flow-arrow">&#8594;</div>
+                    <div class="flow-step">
+                        <div class="flow-icon" style="border-color: var(--gris-oscuro); color: var(--gris-oscuro);">3</div>
+                        <h3>Interceptor</h3>
+                        <p style="font-size: 14px;">Valida RLS y bloquea o inyecta filtros.</p>
+                    </div>
+                    <div class="flow-arrow">&#8594;</div>
+                    <div class="flow-step">
+                        <div class="flow-icon">4</div>
+                        <h3>Gráficos</h3>
+                        <p style="font-size: 14px;">Gemini dibuja con colores Práxedes.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Script de Interactividad -->
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const btnPrev = document.getElementById('btn-prev');
+        const btnNext = document.getElementById('btn-next');
+        const progressContainer = document.getElementById('progress');
+        let currentSlide = 0;
+
+        // Crear puntos de progreso
+        slides.forEach((_, index) => {
+            const dot = document.createElement('div');
+            dot.classList.add('progress-dot');
+            if (index === 0) dot.classList.add('active');
+            dot.addEventListener('click', () => goToSlide(index));
+            progressContainer.appendChild(dot);
+        });
+
+        const dots = document.querySelectorAll('.progress-dot');
+
+        function updateUI() {
+            // Actualizar slides
+            slides.forEach((slide, index) => {
+                if (index === currentSlide) {
+                    slide.classList.add('active');
+                } else {
+                    slide.classList.remove('active');
+                }
+            });
+
+            // Actualizar botones
+            btnPrev.disabled = currentSlide === 0;
+            btnNext.disabled = currentSlide === slides.length - 1;
+
+            // Actualizar puntos
+            dots.forEach((dot, index) => {
+                if (index === currentSlide) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            });
+        }
+
+        function nextSlide() {
+            if (currentSlide < slides.length - 1) {
+                currentSlide++;
+                updateUI();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+                updateUI();
+            }
+        }
+
+        function goToSlide(index) {
+            currentSlide = index;
+            updateUI();
+        }
+
+        // Navegación con teclado
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        // Inicialización
+        updateUI();
+    </script>
+</body>
+</html>

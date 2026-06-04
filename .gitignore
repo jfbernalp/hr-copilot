@@ -1,0 +1,23 @@
+# Entornos Virtuales
+.venv/
+venv/
+env/
+ENV/
+
+# Archivos compilados de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Configuración local y secretos (¡MUY IMPORTANTE!)
+.env
+.DS_Store
+
+# Archivos de caché
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Bases de datos y almacenamiento (Opcional, según diseño)
+# chroma.sqlite3 # <- Descomentar si no quieres subir la DB local
+# /data/ # <- Descomentar si tienes datos privados
