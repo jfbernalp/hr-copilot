@@ -36,7 +36,7 @@ def _inject_dept_filter(sql: str, dept_id: int) -> str:
     Maneja queries con y sin WHERE existente.
     """
     sql = sql.strip().rstrip(";")
-    filter_clause = f"e.department_id = {dept_id}"
+    filter_clause = f"department_id = {dept_id}"
 
     where_match = re.search(r"\bWHERE\b", sql, re.IGNORECASE)
     if where_match:
