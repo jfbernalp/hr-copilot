@@ -1250,17 +1250,25 @@ def _chat_bubble_assistant(turn):
     """Renderiza la respuesta del asistente: error, o gráfico + tabla + SQL colapsable."""
     inner = []
 
+    has_fig = False
     if turn.get("error"):
         inner.append(html.Div([
             html.Span("⚠ ", style={"fontWeight": "800"}),
             turn["error"],
         ], style={"color": C["danger"], "fontSize": "13px", "fontWeight": "600"}))
     else:
-        # Gráfico
+        # Gráfico — ocupa todo el ancho del chat (sin dimensiones fijas heredadas)
         if turn.get("fig_json"):
             try:
                 fig = pio.from_json(turn["fig_json"])
-                inner.append(dcc.Graph(figure=fig, style={"height": "380px"}, config={"displayModeBar": False}))
+                fig.update_layout(autosize=True, height=None, width=None)
+                only_indicator = bool(fig.data) and all(tr.type == "indicator" for tr in fig.data)
+                inner.append(dcc.Graph(
+                    figure=fig,
+                    style={"height": "220px" if only_indicator else "480px", "width": "100%"},
+                    config={"displayModeBar": False, "responsive": True},
+                ))
+                has_fig = True
             except Exception:
                 pass
 
@@ -1304,16 +1312,21 @@ def _chat_bubble_assistant(turn):
                 }),
             ]))
 
+    # Con gráfico la burbuja se expande al 100% del chat; solo-texto mantiene 85%.
+    bubble_style = {
+        "background": C["white"], "padding": "18px 20px", "borderRadius": "4px 18px 18px 18px",
+        "maxWidth": "85%", "boxShadow": "0 2px 12px rgba(0,0,0,0.05)", "border": "1px solid rgba(0,0,0,0.04)",
+    }
+    if has_fig:
+        bubble_style.update({"width": "100%", "maxWidth": "100%", "flex": "1"})
+
     return html.Div([
         html.Div("🤖", style={
             "fontSize": "16px", "background": "rgba(56,56,56,0.06)", "width": "34px", "height": "34px",
             "borderRadius": "50%", "display": "flex", "alignItems": "center", "justifyContent": "center",
             "flexShrink": 0, "marginRight": "12px",
         }),
-        html.Div(inner, style={
-            "background": C["white"], "padding": "18px 20px", "borderRadius": "4px 18px 18px 18px",
-            "maxWidth": "85%", "boxShadow": "0 2px 12px rgba(0,0,0,0.05)", "border": "1px solid rgba(0,0,0,0.04)",
-        }),
+        html.Div(inner, style=bubble_style),
     ], style={"display": "flex", "alignItems": "flex-start", "marginBottom": "18px"})
 
 
@@ -1385,7 +1398,7 @@ def layout_chat(role):
                     "height": "56px", "fontSize": "16px",
                 }),
             ], style={"display": "flex", "alignItems": "center", "marginTop": "18px"}),
-        ], style={"padding": "40px", "maxWidth": "1100px", "margin": "0 auto"}),
+        ], style={"padding": "40px", "maxWidth": "1300px", "margin": "0 auto"}),
     ], style={"background": C["gray_bg"], "minHeight": "100vh"})
 
 
