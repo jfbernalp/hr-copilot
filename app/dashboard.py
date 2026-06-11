@@ -791,8 +791,11 @@ app.index_string = """
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
+        :root { color-scheme: light; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #f5f5f5; color: #383838; font-family: 'Montserrat', sans-serif; overflow-x: hidden; }
+        input { color: #383838; background-color: #ffffff; caret-color: #ff8b00; }
+        input::placeholder { color: #aaaaaa; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #f5f5f5; }
         ::-webkit-scrollbar-thumb { background: #dddddd; border-radius: 3px; }
@@ -929,11 +932,13 @@ def layout_login():
                 dcc.Input(id="login-user", type="text", placeholder="ej. admin", autoComplete="username", style={
                     "width": "100%", "padding": "14px 16px", "borderRadius": "25px", "boxSizing": "border-box",
                     "border": "1px solid " + C["gray_light"], "fontFamily": FONT, "fontSize": "13px",
+                    "color": C["gray_dark"], "background": C["white"],
                     "outline": "none", "marginBottom": "18px"}),
                 html.Div("CONTRASEÑA", style={"fontSize": "10px", "fontWeight": "800", "color": C["gray_dark"], "letterSpacing": "0.06em", "marginBottom": "8px"}),
                 dcc.Input(id="login-pass", type="password", placeholder="••••••••", n_submit=0, autoComplete="current-password", style={
                     "width": "100%", "padding": "14px 16px", "borderRadius": "25px", "boxSizing": "border-box",
                     "border": "1px solid " + C["gray_light"], "fontFamily": FONT, "fontSize": "13px",
+                    "color": C["gray_dark"], "background": C["white"],
                     "outline": "none"}),
                 html.Div(id="login-error", style={"color": C["danger"], "fontSize": "12px", "fontWeight": "600",
                                                   "minHeight": "18px", "margin": "12px 2px"}),
