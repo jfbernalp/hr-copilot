@@ -1,0 +1,502 @@
+Indice;Categoria;Nombre del KPI;Descripcion Funcional;Objetivo de negocio;Formula tecnica;Ejemplo de aplicacion del KPI;Grafico recomendado;Puntaje Relevancia
+25;Estructura y Demografía;Headcount Total (Active Headcount);Contabiliza el número exacto de empleados con contrato activo al cierre del periodo, independientemente de la modalidad de jornada o tipo de contrato. Es el denominador de la mayoría de los KPIs de People Analytics y su precisión determina la calidad de todos los indicadores derivados. Se diferencia del FTE en que cada empleado cuenta como una unidad entera sin importar si trabaja tiempo parcial. Es el KPI de referencia para la planificación de dotación, el seguimiento del presupuesto de nómina y la comparación entre periodos y entre empresas del grupo.; Mantener un conteo exacto y actualizado del número de empleados con contrato activo como denominador base de todos los KPIs de People Analytics, con el fin de garantizar la precisión de los indicadores derivados, habilitar el seguimiento mensual del presupuesto de dotación aprobado, y proporcionar la señal de referencia para decisiones de planificación de fuerza laboral y control del gasto en nómina.;Conteo de empleados con contrato activo al cierre del periodo (fecha de corte definida por la empresa);"Empresa: Textiles Andinos S.A.S. | Periodo: cierre abril 2025
+
+Datos:
+  Headcount cierre marzo 2025:    2.985 empleados
+  Ingresos en abril:                 87 empleados
+    Fabrica Bogota:   42 operarios nuevos
+    Fabrica Medellin: 28 operarios nuevos
+    Locales:          17 asesores nuevos
+  Egresos en abril:                  72 empleados
+    Renuncias voluntarias: 48
+    Terminaciones de contrato: 24
+  Headcount cierre abril 2025:    3.000 empleados
+
+Calculo:
+  Headcount = 2.985 + 87 - 72 = 3.000
+  Variacion neta: +15 empleados (+0.5%)";"¿Cuántos empleados activos tenemos hoy y cómo ha evolucionado la plantilla en el último año?
+__ Gráfico combinado: línea de headcount neto + barras de ingresos y egresos por mes — La línea muestra la evolución neta. Las barras apiladas (verde = ingresos, rojo = egresos) por mes explican por qué la línea sube o baja. Juntos responden el estado y la causa sin necesitar dos páginas.";10.0
+66;Desarrollo y Talento;Efectividad de Capacitación (Training Effectiveness Score);"Mide el impacto real de los programas de formación sobre el desempeño de los empleados que los reciben, calculado como la variación porcentual entre el score de desempeño promedio del grupo capacitado en los tres meses posteriores a la capacitación frente a los tres meses anteriores. A diferencia del ROI de Capacitación (KPI 8), que requiere estimar beneficios monetarios, este indicador trabaja directamente con los datos de desempeño disponibles en el sistema. Una variación positiva superior al 5% indica un programa con impacto demostrable; una variación nula o negativa señala que el programa debe ser rediseñado o descontinuado.";Medir el impacto real de los programas de formación sobre el desempeño de los participantes calculando la variación del score de desempeño pre y post capacitación, con el fin de identificar qué programas generan mejora demostrable y cuáles deben rediseñarse o descontinuarse.;"((Score de desempeño promedio post-capacitación _ Score de desempeño promedio pre-capacitación) / Score de desempeño promedio pre-capacitación) _ 100
+
+Donde:
+• Score pre = Promedio de evaluaciones de desempeño del grupo capacitado en los 3 meses anteriores a la capacitación
+• Score post = Promedio de evaluaciones de desempeño del mismo grupo en los 3 meses posteriores a la capacitación
+• El resultado es un porcentaje de variación: positivo indica mejora, negativo indica deterioro o ausencia de impacto";"Empresa: Textiles Andinos S.A.S. | Periodo: Q1 2025 | Programa: Tecnicas de atencion al cliente para asesores de locales (120 asesores)
+
+Datos:
+  Score promedio de desempeno del grupo (3 meses antes del programa):   3.1 / 5
+  Score promedio de desempeno del grupo (3 meses despues del programa): 3.7 / 5
+
+Calculo:
+  Variacion = ((3.7 - 3.1) / 3.1) x 100 = (0.6 / 3.1) x 100 = 19.4%";"¿Los programas de capacitación están generando una mejora real y medible en el desempeño de quienes los reciben?
+__ Barras horizontales por programa ordenadas por variación de desempeño pre vs. post — Línea de referencia en cero: barras a la derecha = impacto positivo, barras que no la alcanzan = sin evidencia de mejora. Formato condicional verde para variación >5% y rojo para variación neutra o negativa.";10.0
+34;Gestión de la Rotación y Retención;Índice de Riesgo de Fuga (Flight Risk Index);Score predictivo individual que combina mediante un modelo ponderado cuatro señales de alerta de rotación voluntaria: nivel de ausentismo normalizado (peso orientativo 25–30%), frecuencia de horas extra normalizada (20–25%), antigüedad inversa normalizada (mayor riesgo a menor antigüedad, peso 20–25%) y score de desempeño inverso normalizado (menor desempeño = mayor riesgo, peso 15–20%). El resultado es un score de 0 a 100 por empleado, donde valores superiores a 70 indican riesgo alto y requieren intervención prioritaria. Permite a los líderes de RRHH actuar antes de que se produzca la renuncia, convirtiendo un evento reactivo en una gestión proactiva de la retención.;Identificar a los empleados con mayor probabilidad de renuncia voluntaria en los próximos 90 días mediante un score predictivo ponderado, con el fin de priorizar intervenciones de retención antes de que se produzca la baja, reducir el costo estimado de rotación (KPI 35), proteger la continuidad operativa de las áreas críticas y convertir la gestión de la retención de un proceso reactivo a uno preventivo y basado en datos.;Modelo ponderado: (w1 _ Ausentismo_norm) + (w2 _ Horas_extra_norm) + (w3 _ Antigüedad_inversa) + (w4 _ Score_desempeño_inverso) _ score 0–100;"Empresa: Textiles Andinos S.A.S. | Empleada: Maria Lopez | Operaria confeccion Bogota | Antiguedad: 1.8 anos
+Variables normalizadas (escala 0-1):
+  Ausentismo_norm:              0.78 (5 episodios en el trimestre — Bradford 150 del KPI 23)
+  Horas_extra_norm:             0.60 (turno con 20% de OT del KPI 16)
+  Antiguedad_inversa_norm:      0.82 (1.8 anos — rango de maximo riesgo)
+  Score_desempeno_inverso_norm: 0.40 (desempeno 3.2/5 — aceptable, riesgo bajo)
+
+Pesos orientativos: w1=0.30 | w2=0.20 | w3=0.25 | w4=0.25
+
+Calculo:
+  Score = (0.78x0.30) + (0.60x0.20) + (0.82x0.25) + (0.40x0.25)
+        = 0.234 + 0.120 + 0.205 + 0.100
+        = 0.659 x 100 = 65.9 / 100";"¿Qué empleados tienen mayor probabilidad de renunciar en los próximos 90 días y a quiénes debemos intervenir primero?
+__ Tabla de priorización con top 15 empleados por Flight Risk Score descendente + semáforos por variable — Columnas: empleado, score total, ausentismo, horas extra, antigüedad, desempeño. ";10.0
+2;Clima Laboral y Bienestar;Tasa de Incidentes de Salud Ocupacional (Workplace Incident Rate);Cuantifica la frecuencia con la que ocurren accidentes de trabajo, enfermedades laborales e incidentes de seguridad en relación con las horas efectivamente trabajadas. Utiliza el estándar de la OSHA (200.000 horas-hombre como base de normalización) y su equivalente colombiano administrado por las ARL, lo que permite comparaciones entre empresas de distinto tamaño y entre periodos. Un valor elevado o en ascenso indica exposición a riesgos físicos, ergonómicos o psicosociales no controlados, y puede derivar en sanciones normativas, incremento de primas de riesgos laborales y pérdida de productividad por ausentismo médico.;Controlar la frecuencia de accidentes de trabajo y enfermedades laborales en relación con las horas efectivamente trabajadas, con el fin de reducir el ausentismo médico, mitigar el riesgo de sanciones regulatorias por parte de la ARL y el Ministerio del Trabajo, y proteger la capacidad productiva de la empresa minimizando los costos directos e indirectos derivados de los incidentes.;(Accidentes / HHT reales) _ 200.000;"Empresa: Textiles Andinos S.A.S. | Periodo: marzo 2025 | Alcance: fabricas Bogota y Medellin
+Datos del mes:
+  Accidentes de trabajo calificados (fabrica Bogota):    6
+  Accidentes de trabajo calificados (fabrica Medellin):  3
+  Total accidentes:                                                              9
+  HHT reales del mes — Bogota (1.800 emp x 23 dias hab x 8h - ausencias): 325.800 h
+  HHT reales del mes — Medellin (800 emp x 23 dias hab x 8h - ausencias): 144.800 h
+  HHT total:                                             470.600 h
+
+Calculo:
+  Tasa OSHA = (9 / 470.600) x 200.000 = 3.83
+RESULTADO: 3.83 incidentes por cada 200.000 horas trabajadas
+Interpretacion: Cercano al benchmark FASECOLDA 2026 (3.9 por 100 trabajadores).";"¿Qué áreas y en qué meses concentran la mayor frecuencia de incidentes de salud ocupacional?
+__ Mapa de calor (área _ mes) — Intensidad de color = tasa OSHA. Es la única visualización que revela simultáneamente el quién y el cuándo sin necesidad de filtros. Añadir línea de referencia con el límite legal ARL.";9.5
+7;Desarrollo y Talento;Puntuación Promedio de Desempeño (Performance Score);Centraliza los resultados de los ciclos de evaluación de desempeño en un score promedio que permite comparar el rendimiento entre individuos, equipos y periodos. Su mayor valor analítico no está en el promedio en sí, sino en la distribución: una curva concentrada artificialmente en la media alta indica falta de calibración entre evaluadores, mientras que una distribución con dispersión real permite identificar High Performers, empleados en desarrollo y casos que requieren planes de mejora. Es el insumo base para la matriz 9-Box, el Flight Risk Index, el Burnout Risk Score y las decisiones de compensación variable.;Centralizar los resultados de los ciclos de evaluación para identificar la distribución real del talento organizacional, detectar falta de calibración entre evaluadores, y alimentar decisiones diferenciadas de compensación variable, planes de desarrollo individual, posicionamiento en la matriz 9-Box y activación del modelo de Flight Risk, asegurando que el dato de desempeño sea accionable y no meramente descriptivo.;_ (Calificación_i _ Número de empleados con Calificación_i) / Total de empleados evaluados;"Empresa: Textiles Andinos S.A.S. | Periodo: ciclo semestral jun 2025 | Evaluados: 2.800 empleados | Escala: 1-5
+
+Distribucion de calificaciones:
+  Nota 1 (bajo):    112 empleados ->  4%
+  Nota 2:           252 empleados ->  9%
+  Nota 3 (medio):  1.092 empleados -> 39%
+  Nota 4:           980 empleados -> 35%
+  Nota 5 (alto):    364 empleados -> 13%
+
+Calculo:
+  Score = (112x1 + 252x2 + 1092x3 + 980x4 + 364x5) / 2.800
+        = (112 + 504 + 3.276 + 3.920 + 1.820) / 2.800
+        = 9.632 / 2.800 = 3.44 / 5
+
+RESULTADO: 3.44 / 5 con desviacion estandar 0.93";"¿Cómo se distribuyen las calificaciones de desempeño? ¿Hay concentración anormal en la media o existe dispersión real de talento?
+__ Barras agrupadas por rango de puntuación — Rangos calculados en DAX (ej. 1–2 / 2–3 / 3–4 / 4–5). Revela si la empresa tiene una curva de talento sana o si los líderes están inflando calificaciones con acumulación artificial en la media alta.";9.5
+15;Eficiencia Operativa de RR.HH.;Tasa de Ausentismo (Absenteeism Rate);Expresa qué porcentaje de los días u horas laborables disponibles se pierden por ausencias no programadas (enfermedad, permisos no justificados, ausentismo injustificado). Es un indicador multicausal que puede reflejar problemas de clima laboral, sobrecarga de trabajo, liderazgo deficiente, condiciones ergonómicas inadecuadas o problemas de salud sistémicos en la plantilla. Al monitorearse mensualmente y segmentarse por área, permite detectar focos de alerta antes de que se conviertan en riesgos de rotación o incapacidades prolongadas. El costo financiero del ausentismo se cuantifica en el KPI 17.;Expresar como porcentaje la proporción de días u horas laborables que se pierden por ausencias no programadas, con el fin de detectar focos de alerta por área antes de que se traduzcan en rotación o incapacidades prolongadas, cuantificar el impacto operativo real del ausentismo y fundamentar la inversión en programas preventivos de salud ocupacional, clima laboral y liderazgo.;"Tasa de Ausentismo días = (Días de ausencia en el periodo / Días laborables disponibles en el periodo) _ 100
+Tasa de Ausentismo horas = (Horas de ausencia en el periodo / Horas laborables disponibles en el periodo) _ 100";"Datos:
+  Empleados activos:                                    3.000
+  Dias laborables disponibles (3.000 x 23):            69.000 dias
+  Dias de ausencia registrados:
+    Fabrica Bogota  (1.800 emp): 1.260 dias -> tasa 3.0%
+    Fabrica Medellin (800 emp):   640 dias -> tasa 3.5%
+    Locales y oficinas (400 emp): 200 dias -> tasa 2.2%
+  Total dias de ausencia:                               2.100 dias
+
+Calculo global:
+  Tasa = (2.100 / 69.000) x 100 = 3.04%";"¿Cuántos días productivos perdemos por ausentismo cada mes y la tasa está subiendo o bajando?
+__ Gráfico combinado (barras + línea) — Barras = días absolutos de ausencia por mes (volumen). Línea superpuesta = tasa porcentual (tendencia relativa). Las dos series juntas responden el cuánto y el si está escalando sin necesitar dos gráficos separados.";9.5
+16;Eficiencia Operativa de RR.HH.;Frecuencia de Horas Extras (Overtime Rate);Mide qué proporción representan las horas extra trabajadas sobre las horas regulares en un periodo determinado. Más allá del impacto directo en el costo de nómina, las horas extra recurrentes en las mismas áreas o turnos son un predictor temprano de fatiga, burnout y rotación voluntaria. Cuando la tasa supera el 10% de forma sostenida, indica que la dotación del área es insuficiente para la carga operativa real, lo que requiere revisar el dimensionamiento de turnos o la eficiencia de los procesos antes de continuar absorbiendo el costo vía recargos.;Medir la proporción de horas extra sobre las horas regulares para identificar áreas con sobrecarga operativa estructural que supera la capacidad de dotación planificada, anticipar riesgos de fatiga y burnout en la plantilla, controlar el impacto de los recargos en el costo de nómina y fundamentar decisiones de redimensionamiento de turnos o revisión de la eficiencia de los procesos productivos.;(Total de horas extras trabajadas / Total de horas regulares trabajadas) _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: noviembre 2025 (temporada alta — aguinaldos) | Alcance: fabricas
+
+Datos:
+  Horas regulares trabajadas en el mes (fabricas):  460.800 h
+  Horas extra trabajadas en el mes (fabricas):       92.160 h
+
+Calculo:
+  Tasa = (92.160 / 460.800) x 100 = 20%
+
+RESULTADO: 20% — zona critica";"¿Qué áreas o turnos están operando sistemáticamente con horas extra y la sobrecarga es nueva o lleva meses instalada?
+__ Tarjeta KPI del periodo actual + gráfico de línea de tendencia (12 meses) — La tarjeta muestra el estado puntual con alerta visual (>10%). La línea responde si es un pico puntual o una tendencia crónica. Son dos preguntas distintas que requieren dos elementos visuales.";9.5
+51;Nómina y Compensación;Índice de Equidad Interna Salarial (Compa-Ratio);"Compara el salario real de cada empleado con el punto medio de la banda salarial definida para su nivel o cargo, expresado como un ratio adimensional. Un compa-ratio de 1,0 significa que el empleado está exactamente en el punto medio de su banda. Valores inferiores a 0,85 indican posible subcompensación con riesgo de rotación; valores superiores a 1,15 pueden señalar salarios desactualizados respecto a la banda o beneficios compensatorios que elevan el total por encima del mercado. Es el indicador base para los procesos de revisión salarial y para identificar casos de inequidad interna antes de que se conviertan en un problema de retención o de brecha de género.";Comparar el salario real de cada empleado con el punto medio de la banda salarial de su nivel para identificar casos de subcompensación con riesgo de rotación o de salarios por encima del rango que señalen bandas desactualizadas, con el fin de fundamentar los procesos de revisión salarial con evidencia objetiva, detectar inequidades internas antes de que se conviertan en un problema de retención o de brecha de género, y asegurar la coherencia de la política de compensación en toda la organización.;Salario real del empleado / Punto medio de la banda salarial de su nivel;"Empresa: Textiles Andinos S.A.S. | Periodo: cierre 2025 | Nivel: lider de linea de produccion
+Banda salarial aprobada:
+  Minimo: COP 2.500.000 | Punto medio: COP 3.250.000 | Maximo: COP 4.000.000
+Datos de 3 lideres representativos:
+  Lider A — Bogota, 8 anos:   Salario COP 3.900.000 | Compa-Ratio = 3.900.000/3.250.000 = 1.20
+  Lider B — Bogota, 2 anos:   Salario COP 2.600.000 | Compa-Ratio = 2.600.000/3.250.000 = 0.80
+  Lider C — Medellin, 5 anos: Salario COP 3.200.000 | Compa-Ratio = 3.200.000/3.250.000 = 0.98";"¿Los salarios de cada empleado están dentro de la banda salarial de su nivel o hay casos por debajo o por encima del rango?
+__ Gráfico de dispersión (scatter plot): eje X = nivel/banda salarial, eje Y = compa-ratio del empleado — Un punto por empleado. Líneas de referencia horizontales en 0.85 y 1.15 delimitan la zona de equidad. Los puntos fuera de esas líneas son casos de intervención inmediata.";9.5
+60;Plazas y Gestión de Vacantes;Costo por Plaza Vacante (Cost of Vacancy);Monetiza el impacto económico de mantener una posición sin cubrir, calculando el costo diario de la vacante como el producto del salario mensual de la posición por un factor de productividad perdida que varía según el nivel del cargo (0,5x–2x del salario mensual) y multiplicándolo por los días transcurridos sin cobertura. Este indicador transforma la urgencia de cobertura de un criterio subjetivo a uno financiero, permitiendo priorizar objetivamente qué vacantes abrir primero cuando los recursos de reclutamiento son limitados. Las posiciones de mayor impacto financiero diario acumulado son las de intervención urgente.;Monetizar el impacto económico diario de cada plaza sin cubrir, con el fin de transformar la urgencia de cobertura de un criterio subjetivo a uno financiero, priorizar objetivamente qué vacantes abrir y cubrir primero cuando los recursos de reclutamiento son limitados, y proporcionar a la dirección un argumento cuantificado para acelerar la aprobación de los procesos de selección críticos.;Salario mensual de la posición _ Factor de productividad perdida (usualmente 0.5–2x) _ Meses sin cubrir;"Empresa: Textiles Andinos S.A.S. | Vacante: Jefe de Calidad Fabrica Bogota | Lleva abierta: 4 meses
+Datos:
+  Salario mensual de la posicion:   COP 4.500.000
+  Factor productividad perdida:     1.3x (perfil profesional, rol critico en fabrica)
+  Meses sin cubrir:                 4
+Calculo:
+  Costo = 4.500.000 x 1.3 x 4 = COP 23.400.000";"¿Cuánto nos cuesta cada día que una plaza crítica permanece vacante y cuáles posiciones debemos priorizar cubrir primero?
+__ Barras horizontales por vacante, ordenadas de mayor a menor costo acumulado — La longitud de la barra = costo total acumulado desde la apertura de la vacante. Las más largas son urgencia máxima. Formato condicional de color rojo en vacantes que superen el umbral crítico.";9.5
+61;Plazas y Gestión de Vacantes;Tasa de Aceptación de Oferta (Offer Acceptance Rate);"Mide qué porcentaje de los candidatos que reciben una oferta laboral formal la acepta y formaliza su incorporación. El benchmark de industria se sitúa alrededor del 84% (Gem Benchmarks 2024); valores inferiores al 75% son señales de alerta que indican pérdida de competitividad salarial, deterioro del employer branding, problemas en la experiencia del candidato durante el proceso o una brecha entre las expectativas generadas y las condiciones reales de la oferta. Este KPI es especialmente sensible en mercados de talento escaso, donde los candidatos seleccionados reciben múltiples ofertas simultáneas.";Medir qué porcentaje de los candidatos que reciben una oferta formal la aceptan, con el fin de monitorear la competitividad salarial de la empresa en el mercado laboral, identificar brechas entre las expectativas generadas durante el proceso de selección y las condiciones reales de la oferta, y orientar ajustes en la propuesta de valor al candidato antes de que la caída de aceptaciones afecte los tiempos y costos del proceso de adquisición de talento.;(Ofertas aceptadas / Total de ofertas extendidas) _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: Q3 2025 | 80 ofertas laborales extendidas
+Datos:
+  Ofertas extendidas:    80
+  Ofertas aceptadas:     60
+  Ofertas rechazadas:    20
+Calculo:
+  Tasa = (60 / 80) x 100 = 75%";"¿Qué porcentaje de candidatos acepta la oferta cuando se la extendemos y la tasa está cayendo?
+__ Gráfico de línea trimestral con anotaciones de cambios en tooltip — Un descenso sostenido es señal de pérdida de competitividad salarial o deterioro del employer branding. Las anotaciones de hitos permiten correlacionar causa y efecto al pasar el cursor sobre cada punto.";9.5
+62;Plazas y Gestión de Vacantes;Calidad de Contratación (Quality of Hire);Evalúa si las incorporaciones recientes están cumpliendo las expectativas de desempeño y generando retorno sobre la inversión en reclutamiento. Se calcula como el promedio de tres dimensiones para cada cohorte de contratación: score de desempeño en el primer año, tasa de retención al año uno y evaluación del manager sobre la idoneidad de la contratación. Es el indicador que cierra el ciclo del proceso de selección: permite determinar si el perfil buscado, los criterios de selección y los canales de reclutamiento utilizados están produciendo el tipo de talento que la organización necesita, o si hay que recalibrar el proceso.;Evaluar si las incorporaciones recientes están cumpliendo las expectativas de desempeño y generando retorno sobre la inversión en reclutamiento, con el fin de determinar si los criterios de selección, los canales de reclutamiento y los perfiles buscados están produciendo el talento que la organización necesita, o si es necesario recalibrar el proceso de selección.;Promedio de: (Puntuación de desempeño en 1er año + Tasa de retención a 1 año + Evaluación del manager sobre la contratación) / 3;"Empresa: Textiles Andinos S.A.S. | Cohorte Q1 2025 | 120 nuevas contrataciones de operarios | Evaluados a los 12 meses
+Datos (promedio de las 3 dimensiones):
+  Desempeno en 1er ano (escala 0-100):  68
+    Tasa de retencion al ano (%):                82
+    Evaluacion del supervisor (0-100):       72
+Calculo:
+  Quality of Hire = (68 + 82 + 72) / 3 = 222 / 3 = 74 / 100";"¿Los empleados contratados recientemente están cumpliendo las expectativas de desempeño en su primer año?
+__ Barras por cohorte trimestral de contratación — Una barra por trimestre con el score promedio de calidad. Permite detectar si la calidad mejora con el tiempo (el proceso de selección está madurando) o si hay regresión reciente que indica un cambio en el perfil buscado o en los evaluadores.";9.5
+53;Nómina y Compensación;Masa Salarial Promedio por Empleado (Average Labor Cost per FTE);Calcula el costo laboral total promedio por cada FTE activo, incluyendo salario base, beneficios, carga prestacional (vacaciones, prima, cesantías, intereses de cesantías) y aportes parafiscales. Al expresar el costo en términos de FTE en lugar de headcount, la métrica es comparable entre áreas con distintas proporciones de tiempo parcial. Permite identificar qué departamentos tienen un costo laboral por unidad productiva significativamente mayor o menor que el promedio de la empresa, lo que facilita conversaciones de eficiencia operativa con las áreas de negocio y con la dirección financiera en los procesos de presupuestación anual.;Calcular el costo laboral total promedio por FTE activo (incluyendo salario base, beneficios y cargas), para comparar la eficiencia del gasto entre empleados de la misma plantilla, identificar departamentos con un costo laboral por unidad productiva significativamente desalineado del promedio organizacional, y proporcionar a la dirección financiera una base objetiva para los procesos de presupuestación anual y control de costos de nómina.;Costo total de nómina (salarios + beneficios + cargas) / FTE promedio del periodo;"Empresa: Textiles Andinos S.A.S. | Periodo: Q1 2025
+Datos:
+  Costo total de nomina Q1 (salarios + prestaciones + seguridad social): COP 18.900.000.000
+  FTE promedio del trimestre: 2.850 FTE (KPI 32: 2.700 tiempo completo + 150 equivalentes parciales)
+
+Calculo:
+  Costo por FTE = 18.900.000.000 / 2.850 = COP 6.631.579 / FTE / trimestre
+";"¿Cuánto cuesta en promedio cada empleado por área incluyendo salario, beneficios y cargas sociales?
+__ Barras horizontales por departamento, ordenadas de mayor a menor costo por FTE — Comparativa directa entre áreas. Permite identificar dónde el costo laboral no se justifica con los resultados del área y dónde hay eficiencia que puede replicarse.";9.2
+58;Nómina y Compensación;Costo Total de Nómina sobre Ingresos (Labor Cost Ratio);Expresa qué porcentaje de los ingresos operacionales de la empresa se destina al costo total de nómina (salarios, beneficios y cargas). Es el indicador de sostenibilidad financiera del modelo de gestión de personas: un ratio creciente trimestre a trimestre indica que los costos laborales están creciendo más rápido que los ingresos, lo que deteriora el margen operativo. Los benchmarks sectoriales varían ampliamente: servicios profesionales y consultoría (25–40%), manufactura (15–25%), retail (10–20%). Para empresas de software como los clientes de Midasoft, el rango saludable suele ubicarse entre el 20% y el 35%.;Expresar qué porcentaje de los ingresos operacionales se destina al costo total de nómina para monitorear la sostenibilidad financiera del modelo de gestión de personas, detectar tendencias crecientes que anticipen deterioro del margen operativo antes de que aparezcan en los estados financieros.;(Costo total de nómina del periodo / Ingresos o presupuesto total del periodo) _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: Q2 2025
+Datos:
+  Costo total de nomina del trimestre (3.000 emp): COP 4.725.000.000
+  Ingresos operacionales del trimestre (ventas textil): COP 21.000.000.000
+Calculo:
+  Ratio = (4.725.000.000 / 21.000.000.000) x 100 = 22.5%";"¿Qué porcentaje de los ingresos de la empresa se destina a la masa salarial y esa proporción es sostenible?
+__ Gráfico de área con línea de alerta — Línea temporal del ratio con área sombreada debajo. Línea horizontal de alerta en el umbral definido (ej. >35%). Cuando el área sube por encima de la banda, hay señal de insostenibilidad financiera del modelo de RRHH.";9.0
+71;Horarios y Control de Asistencia;Frecuencia de Incapacidades (Disability Frequency Rate);Mide cuántas incapacidades médicas se generan por cada empleado activo en el periodo, distinguiendo entre incapacidades por enfermedad general (EPS), accidente de trabajo y enfermedad laboral (ARL). Este indicador complementa la Tasa de Ausentismo (KPI 15) al desagregar el ausentismo certificado médicamente del resto de ausencias, permitiendo orientar la intervención hacia el agente correcto: condiciones ergonómicas o de seguridad (ARL), factores de carga física o mental (médico ocupacional) o clima y liderazgo (RRHH). Un área con más de 0,3 incapacidades por empleado por trimestre en sector servicios merece revisión con el COPASST.;Medir cuántas incapacidades médicas se generan por empleado activo distinguiendo entre enfermedad general (EPS), accidente de trabajo y enfermedad laboral (ARL), con el fin de desagregar el ausentismo certificado del resto de ausencias, detectar áreas con frecuencia superior al doble del promedio organizacional que requieran revisión con el COPASST y el sistema de gestión de SST.;(Número total de incapacidades generadas en el periodo / Headcount promedio del periodo);"Empresa: Textiles Andinos S.A.S. | Periodo: Q1 2025 | Headcount promedio: 3.000 empleados
+Incapacidades generadas en el trimestre:
+  Enfermedad general (EPS):      324 incapacidades (81%)
+  Accidente de trabajo (ARL):     54 incapacidades (13.5%)
+  Enfermedad laboral (ARL):       22 incapacidades (5.5%)
+  Total:                         400 incapacidades
+
+Calculo:
+  Tasa = 400 / 3.000 = 0.133 incapacidades por empleado por trimestre";"¿En qué áreas se concentran las incapacidades y el patrón responde a eventos puntuales o a una tendencia crónica que requiere intervención?
+__ Mapa de calor (área _ mes) con tabla de desglose por tipo de diagnóstico .
+El mapa de calor revela el patrón estructural: un área con color consistentemente intenso en varios meses consecutivos tiene un problema sistémico, no puntual. La tabla complementaria desglosa por tipo de incapacidad (enfermedad general, accidente de trabajo, enfermedad laboral) para orientar si la intervención corresponde a la ARL, al médico ocupacional o al líder directo. Línea de referencia en el promedio histórico de la empresa para contextualizar los picos.";9.0
+70;Horarios y Control de Asistencia;Indice de Horas Extras ;Mide qué porcentaje del costo total de nómina del periodo corresponde a los conceptos de recargo sobre hora ordinaria liquidados según el Código Sustantivo del Trabajo: hora extra diurna (25%), nocturna (75%), dominical ordinaria (75%) y extra dominical (100%). Un índice superior al 5% en un área durante dos meses consecutivos señala una dependencia estructural de horas extra para sostener la operación, que indica que la dotación del turno está subdimensionada respecto a la carga real de trabajo. Su lectura conjunta con la Frecuencia de Horas Extra (KPI 16) permite distinguir si el problema es de volumen de horas o de concentración en pocos empleados.;Medir qué porcentaje del costo total de nómina corresponde a los recargos por horas extra liquidados conforme al Código Sustantivo del Trabajo, con el fin de identificar áreas con dependencia estructural de horas extra para sostener la operación, cuantificar el impacto financiero de la sobrecarga en términos de COP para la dirección financiera.;Valor Horas Extras/Costo Total de la nomina ;"Empresa: Textiles Andinos S.A.S. | Periodo: noviembre 2025 | Nomina total del mes: COP 1.889.100.000
+Recargos liquidados en el mes (fabricas):
+  Horas extra diurnas (25% sobre valor hora ordinaria):          COP 72.000.000
+  Horas extra nocturnas (75%):                                  COP 108.000.000
+  Recargo dominical ordinario (75%):                             COP 54.000.000
+  Horas extra en dominical/festivo (100%):                       COP 28.000.000
+  Total valor horas extras y recargos:                          COP 262.000.000
+
+Calculo:
+  Indice = (262.000.000 / 1.889.100.000) x 100 = 13.9%";"¿Qué parte del presupuesto de nómina se está consumiendo en horas extra y en qué áreas ese peso financiero es estructural y no puntual?
+__Gráfico combinado (barras apiladas + línea de tendencia) con doble eje — Eje izquierdo: barras apiladas por área mostrando el costo absoluto de horas extra en COP, segmentadas por tipo de recargo (diurna / nocturna / dominical-festiva). Eje derecho: línea con el índice porcentual sobre nómina total del periodo. La combinación permite ver simultáneamente dónde está el problema en dinero real y si la proporción sobre nómina está subiendo o bajando. Una barra alta con línea descendente indica que el costo es grande pero se está controlando; una barra moderada con línea ascendente es la señal de alerta real: el problema está creciendo aunque aún no sea visible en términos absolutos.";9.0
+20;Eficiencia Operativa de RR.HH.;Tiempo de Cobertura de Vacante (Time to Fill);"Mide los días calendario transcurridos desde la apertura formal de una vacante hasta la incorporación efectiva del candidato seleccionado, incluyendo todas las etapas del proceso: publicación, atracción, selección, oferta y onboarding inicial. Es el principal indicador de la agilidad del proceso de adquisición de talento. El benchmark SHRM establece 44 días como referencia global; los roles especializados o directivos pueden superar los 90 días sin que sea necesariamente un problema, mientras que roles operativos con tiempos superiores a 30 días señalan cuellos de botella en el embudo de reclutamiento.";Medir la agilidad del proceso de adquisición de talento cuantificando los días transcurridos desde la apertura de una vacante hasta la incorporación efectiva del candidato, con el fin de identificar cuellos de botella en el embudo de reclutamiento por tipo de cargo, comparar el desempeño del área frente al benchmark sectorial de 44 días (SHRM) y optimizar los recursos y los canales del proceso de selección.;Promedio de días desde apertura de la vacante hasta la fecha de incorporación del empleado seleccionado;"Empresa: Textiles Andinos S.A.S. | Periodo: Q3 2025 | Muestra: 10 vacantes cerradas
+
+Datos (dias desde apertura hasta incorporacion):
+  Operario de confeccion Bogota:          22 dias
+  Operario de confeccion Bogota:          18 dias
+  Operario de confeccion Medellin:        25 dias
+  Lider de linea Bogota:                  45 dias
+  Lider de linea Medellin:                52 dias
+  Asesor comercial local Bogota:          31 dias
+  Asesor comercial local Cali:            28 dias
+  Jefe de calidad Bogota:                 67 dias
+  Coordinador de logistica:               58 dias
+  Gerente de zona comercial:              83 dias
+
+Calculo:
+  Time to Fill promedio = (22+18+25+45+52+31+28+67+58+83) / 10 = 429 / 10 = 42.9 dias";"¿Cuántos días tardamos en cubrir vacantes por área y cuáles superan el benchmark de 44 días?
+__ Barras horizontales por vacante o área, ordenadas de mayor a menor tiempo — El largo de la barra es el tiempo en días. Línea de referencia vertical en 44 días (benchmark SHRM). Las barras que cruzan la línea están en zona de alerta y se resaltan en rojo.";9.0
+44;Horarios y Control de Asistencia;Porcentaje de Cobertura de Turnos (Shift Coverage Rate);Evalúa si cada turno programado cuenta con la dotación mínima de empleados requerida para operar con normalidad. Cuando la cobertura cae por debajo del 100%, los empleados presentes deben absorber la carga de los ausentes, lo que alimenta directamente los indicadores de horas extra y burnout. Es un KPI crítico en sectores de atención continua como salud, manufactura o retail, donde la subbcobertura de un turno tiene consecuencias operativas y, en algunos casos, regulatorias (protocolos de seguridad mínima). Su monitoreo semanal permite a los supervisores anticipar y gestionar las ausencias antes de que impacten la operación.;Evaluar si cada turno programado cuenta con la dotación mínima necesaria para operar con normalidad, con el fin de prevenir la sobrecarga del personal presente, anticipar riesgos operativos y regulatorios en sectores con protocolos de seguridad mínima, y proporcionar a los supervisores la señal de alerta anticipada que les permita gestionar las ausencias antes de que impacten la cobertura y los resultados del turno.;(Turnos cubiertos con dotación mínima / Total de turnos programados) _ 100;"Datos:
+  Total de turnos programados en la semana (5 dias x 3 turnos): 15
+  Dotacion minima por turno: 180 operarios
+  Turnos con dotacion completa:  11 turnos
+  Turnos con deficit de personal: 4 turnos
+Calculo:
+  Tasa = (11 / 15) x 100 = 73.3%";"¿Todos los turnos tienen la dotación mínima requerida o hay déficit de cobertura operativa?
+__ Barras por turno (M/T/N) con línea de referencia en 100% de dotación mínima — Las barras que no alcanzan la línea están en déficit. Inmediato para el supervisor de operaciones sin necesidad de interpretación. Formato condicional de color rojo en las barras bajo el mínimo.";9.0
+35;Gestión de la Rotación y Retención;Costo Estimado de Rotación (Turnover Cost);Monetiza el impacto real de cada baja en la organización sumando los costos de reclutamiento del reemplazo, el tiempo de onboarding y la pérdida de productividad durante el periodo de vacante y de rampa del nuevo empleado. El factor de productividad perdida varía según el nivel del cargo: 50–75% del salario anual para perfiles operativos, 100–150% para profesionales y mandos medios, y hasta 200% para directivos y especialistas clave. Al multiplicar este costo unitario por el número de bajas del periodo, la organización puede cuantificar el retorno de inversión potencial de programas de retención, desarrollo y clima laboral.;Monetizar el impacto real de cada baja voluntaria o involuntaria sumando los costos de reclutamiento, onboarding y productividad perdida, con el fin de proporcionar a la dirección financiera los argumentos cuantitativos que justifiquen la inversión en programas de retención, desarrollo y clima, y de identificar qué áreas generan el mayor impacto financiero por rotación para priorizar la intervención.;Total de bajas en el periodo _ (Costo de reemplazo por empleado: reclutamiento + onboarding + productividad perdida);" Empresa: Textiles Andinos S.A.S. | Periodo: Q3 2025 | 24 bajas en el trimestre
+Lideres de linea y supervisores (24 bajas):
+    Salario anual promedio: COP 36.000.000
+    Factor: 100% (profesional)
+    Costo unitario: COP 36.000.000
+    Costo total supervisores: 24 x 36.000.000 = COP 864.000.000";"¿Cuánto nos está costando la rotación en cada departamento y qué áreas generan el mayor impacto financiero?
+__ Barras horizontales por departamento, ordenadas de mayor a menor costo — Transforma el costo abstracto en comparativa concreta por área. Añadir etiqueta con el número de bajas dentro de cada barra para distinguir si el costo viene del volumen de salidas o del costo unitario por perfil.";9.0
+1;Clima Laboral y Bienestar;Índice de Compromiso del Empleado (Employee Engagement Index);Mide el grado de vinculación emocional, cognitiva y conductual de los empleados con su organización, su equipo y su rol. Se obtiene a través de encuestas periódicas que evalúan cuatro dimensiones clave: orgullo de pertenencia, disposición a recomendar la empresa como lugar de trabajo, esfuerzo discrecional (hacer más de lo mínimo requerido) e intención de permanencia futura. El resultado se expresa como un score promedio en escala Likert (1–5 o 1–10) que permite segmentar la plantilla en empleados comprometidos, no comprometidos y activamente desconectados. Es el indicador base del módulo de clima organizacional y actúa como señal anticipada de riesgos de rotación y productividad.;Identificar el nivel de vinculación emocional y conductual de la plantilla con el propósito organizacional, de modo que la dirección de RRHH pueda anticipar riesgos de rotación, diseñar intervenciones de cultura diferenciadas por área y demostrar a la alta dirección la relación entre el compromiso del empleado y los resultados operativos del negocio.;(Suma puntajes / Total respuestas);"Empresa: Textiles Andinos S.A.S. | Periodo: Q1 2025 | Alcance: 3.000 empleados
+
+Encuesta trimestral con 4 preguntas Likert escala 1-5. Respondieron 2.430 empleados (tasa de participacion: 81%).
+
+Resultados promedio por pregunta:
+  P1 — Orgullo de pertenecer a Textiles Andinos:       3.6
+  P2 — Recomendaria la empresa como lugar de trabajo:  3.3
+  P3 — Hago mas de lo minimo requerido en mi rol:      4.0
+  P4 — Planeo seguir en la empresa el proximo ano:     3.1
+
+Calculo:
+  Score = (3.6 + 3.3 + 4.0 + 3.1) / 4 = 14.0 / 4 = 3.50 / 5
+
+";"¿En qué dimensiones del engagement hay mayor desconexión y qué porcentaje de empleados se ubica en cada nivel de respuesta?
+__ Barras apiladas 100% (divergentes desde el centro) — Una barra por pregunta del cuestionario, segmentada por nivel Likert (muy en desacuerdo _ muy de acuerdo). El formato divergente centra la visión en los extremos y hace inmediatamente visible dónde está la polarización.";9.0
+57;Nómina y Compensación;Incremento Salarial Promedio (Average Salary Increase %);Mide el porcentaje de variación del salario base promedio entre el ciclo de ajuste actual y el anterior, desagregado por área, nivel jerárquico y sexo. Su principal referencia de contexto en Colombia es el índice de inflación del año y el incremento del Salario Mínimo Legal Mensual Vigente (SMMLV): un incremento promedio inferior al IPC implica pérdida de poder adquisitivo del empleado, lo que es un factor de riesgo de rotación voluntaria especialmente para perfiles de mercado. Para perfiles críticos, la meta de retención generalmente se sitúa entre IPC + 2% e IPC + 5% según los estudios salariales de ACRIP.;Medir el porcentaje de variación del salario base promedio entre ciclos de ajuste, desagregado por área, nivel y sexo, con el fin de verificar que los incrementos aplicados superan la inflación del periodo (preservando el poder adquisitivo del empleado), comparar la política salarial interna con el Salario Mínimo Legal Mensual Vigente y los estudios de mercado de ACRIP, y detectar inequidades en la distribución de los ajustes que puedan generar riesgo de rotación diferencial.;((Salario promedio actual _ Salario promedio del periodo anterior) / Salario promedio del periodo anterior) _ 100;"Empresa: Textiles Andinos S.A.S. | Ciclo de ajuste: enero 2025
+Datos por grupo:
+  Operarios de fabrica (2.600 emp):
+    Salario promedio dic 2024: COP 1.309.000 (SML 2024)
+    Salario promedio ene 2025: COP 1.423.500 (SML 2025)
+    Incremento: ((1.423.500-1.309.000)/1.309.000) x 100 = 8.75%
+  Lideres y supervisores (200 emp):
+    Salario promedio dic 2024: COP 3.000.000
+    Salario promedio ene 2025: COP 3.270.000
+    Incremento: ((3.270.000-3.000.000)/3.000.000) x 100 = 9.0%
+
+  Referencia: SML 2025 aumento 9.54% | Inflacion Colombia 2024: 5.20%";"¿Cuánto subieron los salarios por área en el último ciclo y el incremento superó la inflación del periodo?
+__ Barras agrupadas por área + línea de referencia de inflación — Una barra por área con el % de incremento aplicado. La línea de inflación hace visible de inmediato qué áreas tuvieron incremento real positivo y cuáles perdieron poder adquisitivo sin que el usuario tenga que hacer el cálculo.";8.8
+37;Gestión de la Rotación y Retención;Tasa de Ingresos (Hiring Rate);Mide qué proporción representa el total de nuevas contrataciones del periodo sobre el headcount promedio, expresando la velocidad a la que la organización incorpora talento. Su mayor valor analítico es la lectura comparada con la Tasa de Rotación General: cuando la tasa de ingresos es inferior a la de egresos, la empresa está perdiendo plantilla neta, lo que tiene implicaciones directas sobre la capacidad operativa y la carga de trabajo del equipo existente. Es también un indicador de la actividad del área de adquisición de talento y permite evaluar si la velocidad de contratación responde a los planes de crecimiento aprobados.;Medir la velocidad a la que la organización incorpora talento en relación con el headcount promedio, con el fin de comparar la tasa de nuevas contrataciones con la tasa de rotación, detectar periodos en que la empresa pierde plantilla neta, evaluar si la capacidad de adquisición de talento responde al plan de crecimiento aprobado, y dimensionar adecuadamente los recursos del área de reclutamiento;(Total de nuevas contrataciones en el periodo / Headcount promedio del periodo) _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: mes de abril 2025
+Datos:
+  Nuevas contrataciones en abril:   87 empleados
+  Headcount promedio de abril:   2.993 empleados
+  Bajas en abril:                   72 empleados
+
+Calculo:
+  Tasa de ingresos  = (87 / 2.993) x 100 = 2.91%
+";"¿La tasa de nuevas contrataciones está cubriendo la pérdida de talento o estamos perdiendo plantilla neta?
+__ Gráfico de líneas con dos series (Tasa de Ingresos en verde, Tasa de Rotación en rojo) — La relación entre ambas líneas indica si la empresa crece, se estabiliza o pierde plantilla neta. Cuando la línea roja supera la verde hay alerta de pérdida neta que requiere acción inmediata.";8.5
+73;Nómina y Compensación;Productividad por Costo Laboral (Revenue per Labor Cost);Relaciona los ingresos operacionales generados por cada unidad de negocio con el costo laboral total de esa misma unidad en el mismo periodo, expresado como un ratio. Un índice de 3,0 significa que por cada peso invertido en costo laboral se generan tres pesos de ingreso. Cuando el ratio cae trimestre a trimestre, señala que los costos laborales están creciendo más rápido que los ingresos, lo que anticipa un deterioro del margen operativo antes de que aparezca en los estados financieros. Un ratio inferior a 1,0 indica que el costo laboral supera los ingresos generados por la unidad, lo que representa una alerta financiera inmediata que requiere revisión de la estructura de costos o del modelo de negocio.;Relacionar los ingresos operacionales generados con el costo laboral total de cada unidad de negocio para evaluar el retorno sobre la inversión en personas, detectar unidades donde los costos laborales crecen más rápido que los ingresos anticipando deterioro del margen operativo, identificar unidades con ratio inferior a 1.0 como señal de alerta financiera inmediata, y proporcionar a la dirección general un indicador de eficiencia del capital humano comparable entre unidades y periodos.;Ingresos de la Unidad de Negocio en el periodo / Costo laboral total de la Unidad de Negocio en el mismo periodo;"Empresa: Textiles Andinos S.A.S. | Periodo: Q2 2025
+
+Datos:
+  Ingresos operacionales del trimestre (ventas de ropa y textiles): COP 21.000.000.000
+  Costo laboral total del trimestre:                                COP 4.725.000.000
+
+Calculo:
+  Ratio = 21.000.000.000 / 4.725.000.000 = 4.44";"¿Qué unidades de negocio generan mayor retorno sobre su inversión en costo laboral y la relación está mejorando o deteriorándose?
+__ Barras horizontales por unidad de negocio ordenadas de mayor a menor índice + línea de tendencia trimestral en panel secundario — Las barras comparan la productividad relativa entre unidades en el periodo actual: la longitud de la barra es el retorno por peso invertido en nómina. El panel secundario con línea trimestral responde si la unidad más productiva hoy lo era también hace seis meses o si hay un deterioro en curso. Línea de referencia vertical en el promedio de la empresa para identificar de un vistazo qué unidades están por encima y por debajo del centro. Formato condicional rojo en unidades con índice < 1.0 — significa que el costo laboral supera los ingresos generados, señal de alerta financiera inmediata.";8.5
+67;Estructura y Demografía;Días de Vacaciones Pendientes por Empleado (Vacation Liability Index);"Cuantifica el pasivo laboral acumulado en días de vacaciones causadas y no disfrutadas por cada empleado activo, y lo convierte en un valor monetario total para la empresa. En Colombia, el Código Sustantivo del Trabajo (Art. 186 y 189) reconoce el derecho a 15 días hábiles de vacaciones anuales y permite acumular hasta dos periodos; acumulaciones superiores a 30 días por empleado o a dos periodos sin disfrutar generan un pasivo contable real y pueden derivar en sanciones del Ministerio del Trabajo. Este KPI permite a RRHH gestionar proactivamente el disfrute de vacaciones antes del cierre contable y reducir el riesgo de liquidación masiva.";Cuantificar el pasivo laboral acumulado en días de vacaciones causadas y no disfrutadas y convertirlo en valor monetario, con el fin de gestionar proactivamente el disfrute de vacaciones antes del cierre contable, reducir el riesgo de sanciones del Ministerio del Trabajo por acumulaciones excesivas (que bajo el CST colombiano no pueden superar dos periodos sin disfrutar),  y proporcionar a la dirección financiera la magnitud real del pasivo contingente de vacaciones en el balance.;"Días de vacaciones pendientes del empleado = (Días de vacaciones causadas acumuladas) _ (Días de vacaciones disfrutadas acumuladas)
+
+Pasivo total empresa = _ (Días pendientes _ Salario diario del empleado)
+
+Promedio por empleado = Pasivo total / Headcount activo del periodo";"Empresa: Textiles Andinos S.A.S. | Periodo: cierre septiembre 2025 | Headcount: 3.000 empleados
+Datos:
+  Dias de vacaciones causadas acumuladas (total empresa):    36.000 dias
+  Dias de vacaciones disfrutadas acumuladas (total empresa): 27.000 dias
+  Dias pendientes totales:                               9.000 dias
+  Salario diario promedio:                               COP 55.000
+  Pasivo total = 9.000 x 55.000 =                    COP 495.000.000
+  Promedio por empleado = 9.000 / 3.000 =             3.0 dias pendientes";"¿Qué áreas acumulan más días de vacaciones pendientes y cuánto representa ese pasivo en pesos?
+__ Barras horizontales por departamento, doble eje: eje izquierdo = días promedio pendientes por empleado (barras), eje derecho = pasivo total en COP del área (línea). Línea de referencia horizontal en el umbral de alerta definido por la empresa (ej. 15 días). Formato condicional rojo en áreas que superen el umbral. El doble eje conecta el dato operativo de RRHH con el impacto financiero que le importa a la dirección.";8.5
+56;Nómina y Compensación;Puntualidad en el Pago de Nómina (Payroll On-Time Rate);Mide el porcentaje de ciclos de nómina que son pagados en la fecha comprometida con los empleados y dentro de los plazos establecidos por el Código Sustantivo del Trabajo (Art. 132). La meta es 100% en todos los escenarios: cualquier retraso en el pago de nómina constituye un incumplimiento contractual que erosiona la confianza del empleado de forma inmediata y puede generar sanciones del Ministerio del Trabajo. Su monitoreo mensual permite identificar si los retrasos son ocasionales y corregibles o si responden a problemas estructurales del proceso de cierre de nómina que requieren intervención tecnológica u organizacional.;Verificar qué porcentaje de los ciclos de nómina se pagan en las fechas comprometidas con los empleados y dentro de los plazos establecidos por el Código Sustantivo del Trabajo, con el fin de cumplir con la obligación legal, preservar la confianza del empleado en la empresa, prevenir sanciones del Ministerio del Trabajo, y detectar ciclos con retraso sistemático que requieran intervención tecnológica u organizacional en el proceso de cierre de nómina.;(Ciclos de nómina pagados a tiempo / Total de ciclos de nómina del periodo) _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: semestre 1-2025 | 6 ciclos de nomina mensuales
+Registro por ciclo:
+  Ciclo enero:   Pagado 30 enero (compromiso 30 ene)  -> A TIEMPO
+  Ciclo febrero: Pagado 28 febrero (compromiso 28 feb) -> A TIEMPO
+  Ciclo marzo:   Pagado 03 abril (compromiso 31 mar)  -> RETRASO (3 dias)
+  Ciclo abril:   Pagado 30 abril (compromiso 30 abr)  -> A TIEMPO
+  Ciclo mayo:    Pagado 31 mayo (compromiso 31 may)   -> A TIEMPO
+  Ciclo junio:   Pagado 30 junio (compromiso 30 jun)  -> A TIEMPO
+
+Calculo:
+  Tasa = (5 / 6) x 100 = 83.3%";"¿La nómina se paga siempre en la fecha comprometida o hay ciclos con retraso que afectan la confianza del empleado?
+__ Tarjeta KPI con semáforo (meta: 100%) + tabla de ciclos con retraso — La tarjeta da el estado global de cumplimiento. La tabla lista los ciclos específicos que fallaron con fecha y causa, que es el dato que necesita el equipo de nómina para actuar sobre el problema concreto.";8.5
+54;Nómina y Compensación;Salario Medio por Área (Average Salary by Department);Calcula el salario base promedio de los empleados activos en cada área o departamento, expresado en valor monetario (COP). Permite comparar el nivel retributivo entre áreas de la misma organización, identificar departamentos que se alejan significativamente del promedio empresarial y detectar posibles inequidades en la política salarial interna. Su lectura complementaria con el Compa-Ratio (KPI 51) permite distinguir si las diferencias entre áreas responden a diferencias reales en los niveles jerárquicos predominantes o a una aplicación inconsistente de las bandas salariales.;Calcular el salario base promedio por departamento para comparar el nivel retributivo entre áreas, detectar posibles inequidades en la política salarial interna y determinar si las diferencias entre departamentos responden a diferencias reales en los niveles jerárquicos o a una aplicación inconsistente de las bandas salariales, con el fin de mantener la coherencia de la política de compensación y sustentar las decisiones de ajuste salarial con datos objetivos.;Sumatoria de salarios del área / Total empleados del área;"Empresa: Textiles Andinos S.A.S. | Periodo: cierre 2025 | Salario mensual promedio
+Datos por area:
+  Fabrica Bogota  (1.800 emp): Suma salarios: COP 3.402.000.000 -> Promedio COP 1.890.000
+  Fabrica Medellin (800 emp):  Suma salarios: COP 1.512.000.000 -> Promedio COP 1.890.000
+  Locales comerciales (300 emp): Suma: COP 645.000.000 -> Promedio COP 2.150.000
+  Oficinas centrales (100 emp):  Suma: COP 580.000.000 -> Promedio COP 5.800.000
+  Promedio global empresa:     Suma total COP 6.139.000.000 / 3.000 = COP 2.046.333";"¿Qué áreas tienen el salario promedio más alto y cómo se comparan entre sí?
+__ Barras horizontales por área ordenadas de mayor a menor salario promedio + línea de promedio global — Los nombres de área en el eje Y dan mejor legibilidad cuando hay más de 5 áreas. La línea de promedio global permite identificar de un vistazo qué departamentos están por encima o por debajo del centro.";8.5
+39;Gestión de la Rotación y Retención;Tasa de Rotación General (Turnover Rate);Expresa qué porcentaje de la plantilla promedio abandona la organización en el periodo, incluyendo tanto las salidas voluntarias como las involuntarias. Es el indicador raíz de la gestión de la retención y el punto de entrada para el análisis de causas: por sí solo no diagnostica el problema, pero cuando se compara con el benchmark sectorial (referencia LATAM para software/TI: 18–25% anual) y se desglosa por tipo de baja, antigüedad y área, revela si el fenómeno es estructural o puntual, y si la causa es interna (clima, compensación, liderazgo) o externa (condiciones del mercado laboral).;Expresar el porcentaje de la plantilla promedio que abandona la organización en el periodo (incluyendo bajas voluntarias e involuntarias), como indicador raíz del análisis de retención, con el fin de detectar si el fenómeno es estructural o puntual, y proporcionar el punto de entrada para el análisis de causas que oriente las intervenciones de cultura, compensación o liderazgo.;(Total de bajas en el periodo / Headcount promedio del periodo) _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: cierre 2025 (ano completo)
+Datos:
+   Headcount fin del ano (dic 2025):     3.143 (proyectado KPI 33)
+  Total de bajas en el ano:                     864
+Calculo:
+  Tasa = (864 / 2.982) x 100 = 29%";"¿Qué porcentaje de la plantilla estamos perdiendo cada periodo y cómo se compara con el benchmark sectorial?
+__ Gráfico de línea temporal con línea de benchmark sectorial superpuesta — La comparación contra benchmark es el dato que le da contexto al número. Sin ella el directivo no puede saber si el 15% de rotación es bueno o malo para su industria.";8.5
+11;Desarrollo y Talento;Tasa de Promoción Interna (Internal Promotion Rate);Mide qué porcentaje de las vacantes en niveles superiores es cubierto por empleados de la propia organización en lugar de reclutas externos. Una tasa alta refleja la efectividad de los programas de desarrollo, la solidez del pipeline de talento interno y la percepción de oportunidades de crecimiento en los empleados. Desde el punto de vista financiero, la promoción interna reduce el costo por contratación y el tiempo de productividad, ya que el candidato interno ya conoce la cultura, los procesos y los sistemas de la empresa.;Medir la efectividad de los programas de desarrollo y la solidez del pipeline de talento interno como fuente de cobertura de vacantes en niveles superiores, con el fin de reducir el costo y el tiempo de integración asociados a la contratación externa, fortalecer la percepción de oportunidades de crecimiento entre los empleados actuales y mejorar la retención de perfiles de alto potencial.;(Vacantes de nivel superior cubiertas por empleados internos / Total de vacantes cubiertas en el periodo) _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: semestre 1-2025
+
+Datos:
+  Vacantes de nivel supervisor o superior cubiertas en el semestre: 40
+  Cubiertas por empleados internos (operarios ascendidos a lider):  16
+  Cubiertas por candidatos externos:                                                     24
+
+Calculo:
+  Tasa = (16 / 40) x 100 = 40%";"¿Qué porcentaje de las vacantes de nivel superior se cubrieron con talento interno y la tendencia mejora?
+__ Gráfico de línea trimestral con anotaciones de hitos en tooltip — La línea revela si la tasa de promoción interna responde a las inversiones en desarrollo. Las anotaciones de hitos se muestran al pasar el cursor sobre cada punto.";8.5
+33;Estructura y Demografía;Proyección de Headcount (Workforce Demand Forecast);Modelo predictivo que estima el número de empleados necesarios en un horizonte de 3 a 6 meses combinando tres variables: la tendencia de crecimiento histórico del headcount (estimada por regresión lineal o promedio móvil de los últimos 6–12 meses), la tasa de rotación promedio del periodo y la estacionalidad detectada en años anteriores. Su output permite a RRHH anticipar cuándo activar procesos de reclutamiento, dimensionar los recursos del área de selección y alinear el plan de dotación con el presupuesto aprobado. La precisión del modelo se mide con el MAPE: una desviación inferior al 10% en horizonte de 3 meses es el estándar de calidad de referencia.;Anticipar el número de empleados necesarios en un horizonte de tres a seis meses combinando tendencia histórica, tasa de rotación y estacionalidad, con el fin de activar los procesos de reclutamiento en el momento oportuno, dimensionar los recursos del área de selección, alinear el plan de dotación con el presupuesto aprobado y reducir tanto el costo de vacantes prolongadas como el de sobredotación no planificada.;"Headcount_proyectado(t) = Headcount_actual _ (1 + Tasa_crecimiento) _ Egresos_esperados(t) + Ingresos_planificados(t)
+
+Donde Egresos_esperados = Headcount_actual _ Tasa_rotación_promedio
+Y la tasa de crecimiento se estima por regresión lineal o promedio móvil de los últimos 6–12 meses.";"Empresa: Textiles Andinos S.A.S. | Proyeccion: para diciembre 2025 | Base: noviembre 2025 = 3.000 emp
+
+Datos historicos:
+  Tasa de crecimiento historica ultimos 6 meses: +0.5% mensual (crecimiento lento)
+  Tasa de rotacion promedio mensual:              2.4% (72 bajas / 3.000)
+  Ingresos planificados diciembre (temporada alta): 200 contrataciones aprobadas
+
+Calculo para diciembre:
+  Egresos esperados = 3.000 x 2.4% = 72 bajas esperadas
+  Headcount proyectado = 3.000 x (1 + 0.5%) - 72 + 200
+                       = 3.015 - 72 + 200 = 3.143 empleados
+
+RESULTADO: 3.143 empleados proyectados para diciembre 2025";"¿Cuántos empleados necesitaremos en los próximos 3 a 6 meses y para cuándo debemos activar el reclutamiento?
+__ Gráfico de líneas con tres series: histórico real (línea sólida), proyección futura (línea punteada con banda de confianza) y headcount presupuestado (línea de referencia horizontal) — El cruce entre la proyección y el presupuesto indica cuándo abrir nuevos procesos de selección.";8.5
+18;Eficiencia Operativa de RR.HH.;Ratio de Errores en Nómina (Payroll Error Rate);Cuantifica la frecuencia con la que los ciclos de nómina requieren correcciones o recálculos después de su procesamiento inicial. Incluye errores en conceptos salariales, novedades mal aplicadas, deducciones incorrectas o liquidaciones de prestaciones fuera de norma. Un valor persistentemente alto erosiona la confianza del empleado en la empresa, genera retrabajo en el equipo de nómina y puede derivar en contingencias legales por pagos tardíos o incorrectos. En sistemas automatizados como Midasoft, la meta aspiracional es inferior al 0,5%, siendo cualquier valor superior al 1% una señal de alerta que requiere revisión del proceso de cierre.;Cuantificar la frecuencia con que los ciclos de nómina requieren correcciones, con el fin de proteger la confianza del empleado en la empresa, reducir el retrabajo del equipo de nómina, prevenir contingencias legales por pagos incorrectos o tardíos, y verificar que el sistema de gestión de nómina opera dentro de los estándares de precisión esperados para una solución automatizada como Midasoft.;(Número de nóminas con correcciones en el periodo / Total de nóminas procesadas) _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: ciclo de nomina enero 2025 | 3.000 registros procesados
+Datos:
+  Total de nominas procesadas (registros individuales):  3.000
+  Nominas con correccion o recalculo posterior:             24 casos
+Calculo:
+  Tasa = (24 / 3.000) x 100 = 0.8%";"¿Con qué frecuencia hay errores en nómina y estamos dentro del umbral aceptable?
+__ Tarjeta KPI con semáforo (meta: 0%, alerta >1%) — Verde <0.5%, amarillo 0.5–1%, rojo >1%. Más directo que un gauge circular para esta audiencia. Complementar con tabla de ciclos con correcciones para que el equipo de nómina pueda actuar sobre casos concretos.";8.5
+17;Eficiencia Operativa de RR.HH.;Costo Total de Ausentismo (Absenteeism Cost);Convierte el volumen de días de ausencia en impacto financiero concreto, multiplicando los días perdidos por el salario diario promedio y sumando el costo de sustitución (horas extra del equipo restante o personal temporal contratado). Al expresar el ausentismo en pesos, facilita la comparación directa frente a la inversión en programas de bienestar, salud ocupacional o mejora de clima, proporcionando a la dirección financiera los argumentos cuantitativos para aprobar intervenciones preventivas. Es especialmente útil para justificar la implementación de modelos de trabajo flexible o programas de EAP.;Convertir el volumen de ausencias en impacto financiero concreto , sumando el costo de las jornadas perdidas y el costo de sustitución, con el finde proporcionar a la dirección financiera los argumentos cuantitativos que justifiquen la inversión en nuevas contrataciones, programas de bienestar, salud ocupacional y mejora de clima, transformando una métrica operativa de RRHH en un indicador de sostenibilidad de costos laborales.;(Días de ausencia _ Salario diario promedio) + Costo de sustitución (horas extra o personal temporal);"Empresa: Textiles Andinos S.A.S. | Periodo: octubre 2025
+
+Datos:
+  Dias de ausencia totales en el mes:          2.100 dias
+  Salario diario promedio empresa:         COP 55.000
+   Costo directo = 2.100 x 55.000:      COP 115.500.000
+  Horas extra para cubrir ausencias:       3.150 horas
+  (Cada dia ausente genera 1.
+  Costo hora extra promedio:            COP 8.500
+  Costo de sustitucion = 3.150 x 8.500: COP 26.775.000
+
+Calculo:
+  Costo total = 115.500.000 + 26.775.000 = COP 142.275.000";"¿Cuánto nos está costando el ausentismo en dinero real cada mes y cuánto acumula en el año?
+__ Gráfico combinado (barras + línea acumulada) — Barras = costo mensual absoluto. Línea = acumulado anual. Permite comparar el costo total frente a la inversión en programas de bienestar del mismo año.";8.5
+5;Clima Laboral y Bienestar;Índice de Satisfacción del Empleado (eNPS o ESI);Evalúa la disposición del empleado a recomendar la empresa como lugar de trabajo (eNPS) o su nivel general de satisfacción con la experiencia laboral (ESI). El eNPS clasifica a los empleados en promotores (puntuación 9–10), pasivos (7–8) y detractores (0–6), y calcula la diferencia neta entre ambos extremos en un rango de –100 a +100. Es el indicador de clima más sintético y comparable a nivel externo, y actúa como barómetro de la marca empleadora. Cuando cae por debajo de los benchmarks del sector, señala deterioro en cultura, liderazgo o compensación antes de que se manifieste en rotación visible.;Cuantificar la disposición de los empleados a recomendar la empresa como lugar de trabajo y evaluar su nivel de satisfacción con la experiencia laboral, con el propósito de monitorear la salud de la propuesta de valor al empleado (EVP), anticipar deterioros de la marca empleadora antes de que se traduzcan en rotación visible, y orientar acciones correctivas en compensación, liderazgo o cultura.;"eNPS = % Promotores (notas 9–10) _ % Detractores (notas 0–6)
+ESI = [(P1 + P2 + P3) / 3] / 10 _ 100";"Empresa: Textiles Andinos S.A.S. | Periodo: Q2 2025 | Respondieron: 2.100 empleados
+
+eNPS — distribucion de respuestas:
+  Promotores (nota 9-10):   630 empleados -> 30%
+  Neutros (nota 7-8):       840 empleados -> excluidos del calculo
+  Detractores (nota 0-6):   630 empleados -> 30%
+Calculo eNPS:
+  eNPS = 30% - 30% = 0
+
+ESI — promedios de las 3 preguntas (escala 0-10):
+  P1 — Que tan satisfecho estas con tu lugar de trabajo actual: 5.8
+  P2 — Que tan bien cubre tu trabajo tus expectativas:          5.2
+  P3 — Que tan cerca esta tu trabajo de tu ideal:               5.5
+Calculo ESI:
+  ESI = [(5.8 + 5.2 + 5.5) / 3] / 10 x 100
+      = [16.5 / 3] / 10 x 100 = 5.5 / 10 x 100 = 55 / 100
+
+RESULTADO: eNPS = 0 | ESI = 55 / 100";"¿Cuántos empleados son promotores de la empresa y cuántos son detractores? ¿El balance neto mejora o empeora?
+__ Barras horizontales apiladas (detractores / pasivos / promotores) + tarjeta de score eNPS — Las barras muestran la composición de forma intuitiva para cualquier audiencia. El score eNPS va como número grande encima. Más legible que el waterfall para usuarios no analíticos.";8.5
+4;Clima Laboral y Bienestar;Tasa de Participación en Encuestas de Clima (Survey Participation Rate);Mide el porcentaje de empleados invitados que responden efectivamente las encuestas de clima o bienestar en cada ciclo de medición. Una participación inferior al 70% compromete la representatividad estadística de los resultados y limita la capacidad de segmentar por área, cargo o antigüedad. Tasas bajas sostenidas son en sí mismas una señal diagnóstica: pueden reflejar desconfianza en el anonimato, fatiga encuestadora o desconexión con la organización. Este KPI debe medirse antes de interpretar cualquier resultado de clima para validar la solidez de la muestra.;Garantizar la representatividad estadística de los datos de clima organizacional antes de tomar decisiones basadas en ellos, de modo que las intervenciones de cultura sean fundadas en evidencia sólida y no en muestras sesgadas, y que las caídas de participación sean detectadas como señales tempranas de desconfianza o desconexión organizacional que requieren atención inmediata.;(Empleados que respondieron la encuesta / Empleados invitados a responder) _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: encuesta semestral junio 2025
+
+Datos:
+  Empleados invitados:    3.000
+  Empleados que respondieron: 2.100
+
+Calculo:
+  Tasa = (2.100 / 3.000) x 100 = 70%
+
+Desglose por sede:
+  Fabrica Bogota    (1.800 emp invitados): 1.350 respondieron -> 75%
+  Fabrica Medellin  (800 emp invitados):   520 respondieron  -> 65%
+  Locales y oficinas (400 emp invitados):  230 respondieron  -> 57.5%";"¿Qué porcentaje de la plantilla respondió la encuesta y la participación mejora o cae entre ciclos?
+__ Tarjeta KPI con semáforo + gráfico de línea por ciclo de encuesta — La tarjeta comunica el estado de cumplimiento de un vistazo (meta >80%). La línea temporal responde si la participación está mejorando o deteriorándose sin saturar la vista principal.";8.5
+26;Estructura y Demografía;Distribución por Rango de Antigüedad;Segmenta la plantilla activa en cohortes de antigüedad (0–1 año, 1–3 años, 3–5 años, más de 5 años) para mapear la madurez organizacional y los perfiles de riesgo de rotación por tramo. Los empleados con 1–3 años representan el grupo de mayor riesgo de fuga: ya han superado la curva de aprendizaje, se han vuelto productivos y son más visibles para el mercado laboral. Los de 3–5 años están en un punto de bifurcación: se quedan si perciben desarrollo de carrera activo, o inician una búsqueda pasiva si sienten estancamiento. Este KPI es insumo directo para el Flight Risk Index y los planes diferenciados de retención.;Mapear la madurez organizacional de la plantilla segmentando a los empleados por cohortes de antigüedad, con el fin de identificar los tramos de mayor riesgo de rotación, orientar los planes diferenciados de retención según el estadio del ciclo de vida del empleado, y proporcionar al Flight Risk Index los insumos necesarios para modelar el riesgo individual de fuga con mayor precisión.;Conteo de empleados activos por rango de antigüedad definido / Headcount total _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: cierre 2025 | Headcount: 3.000 empleados
+
+Distribucion por rango de antiguedad:
+  0-1 anos:  1.050 empleados -> 35% (alta rotacion historica en sector)
+  1-3 anos:  1.200 empleados -> 40% (rango de mayor riesgo de fuga)
+  3-5 anos:    450 empleados -> 15%
+  +5 anos:     300 empleados -> 10%
+
+Calculo (ejemplo rango 1-3 anos):
+  Participacion = (1.200 / 3.000) x 100 = 40%";"¿En qué cohorte de antigüedad se concentra la plantilla y cuáles tienen mayor riesgo de rotación próxima?
+__ Barras por rango de antigüedad con color por nivel de riesgo — Cohortes (0–1, 1–3, 3–5, +5 años) en el eje X. El color por riesgo (rojo / amarillo / verde) añade la lectura de riesgo sin necesitar un gráfico aparte.";8.5
+43;Gestión de la Rotación y Retención;Índice de Riesgo de Burnout (Burnout Risk Score);"Score predictivo individual que sintetiza cuatro señales de agotamiento laboral ya presentes como KPIs descriptivos: horas extra acumuladas normalizadas (peso orientativo 30%), ausentismo frecuente normalizado (20%), caída en el score de desempeño normalizada (25%) y tiempo prolongado en el mismo cargo sin promoción normalizado (25%). El modelo produce un score de 0 a 100 por empleado; valores superiores a 70 definen la zona crítica de intervención urgente. A diferencia del Flight Risk Index que predice la salida, este indicador anticipa el deterioro del bienestar y el rendimiento del empleado antes de que llegue a la renuncia o al ausentismo crónico.";Anticipar el deterioro del bienestar y el rendimiento individual mediante un score predictivo que sintetiza señales de agotamiento laboral, con el fin de activar intervenciones preventivas antes de que el empleado llegue al ausentismo crónico o la renuncia, proteger la salud mental de la plantilla, reducir el impacto del burnout sobre la productividad del equipo, y cumplir con los estándares de bienestar laboral exigidos por la normativa colombiana de SST.;"Score = (w1 _ Horas_extra_norm) + (w2 _ Ausentismo_norm) + (w3 _ Caída_desempeño_norm) + (w4 _ Tiempo_en_cargo_norm)
+
+Donde cada variable se normaliza en rango 0–1 y los pesos (w) suman 1. Se recomienda validar los pesos con el equipo de RRHH de cada cliente.";"Empresa: Textiles Andinos S.A.S. | Empleado: Pedro Vargas | Lider de linea fabrica Bogota | Antiguedad: 4.2 anos
+
+Variables normalizadas (escala 0-1):
+  Horas_extra_norm:          0.90 (turno con 20% OT durante 3 meses consecutivos)
+  Ausentismo_norm:           0.65 (4 episodios cortos en el trimestre)
+  Caida_desempeno_norm:      0.75 (caida de 4.1 a 3.0 en la ultima evaluacion)
+  Tiempo_en_cargo_norm:      0.60 (4.2 anos como lider de la misma linea sin promocion)
+
+Pesos: w1=0.30 | w2=0.20 | w3=0.25 | w4=0.25
+
+Calculo:
+  Score = (0.90x0.30) + (0.65x0.20) + (0.75x0.25) + (0.60x0.25)
+        = 0.270 + 0.130 + 0.188 + 0.150
+        = 0.738 x 100 = 73.8 / 100";"¿Qué empleados están en riesgo de agotamiento severo ahora mismo y el riesgo está subiendo o bajando?
+__ Tabla de empleados en zona crítica (score >70) ordenada de mayor a menor, con sparkline de evolución mensual por fila — La tabla es la vista principal porque el médico ocupacional y el líder directo necesitan nombres y tendencias, no un gauge global. El sparkline por empleado muestra si el riesgo está escalando o cediendo.";8.0
+55;Nómina y Compensación;Ratio de Beneficios sobre Salario Base (Benefits-to-Base Ratio);Mide qué proporción del costo total de compensación representa el conjunto de beneficios (legales y voluntarios) respecto al salario base. En Colombia, las cargas obligatorias por ley (prestaciones sociales, aportes a seguridad social y parafiscales) representan estructuralmente entre un 40% y un 55% del salario base, lo que eleva el ratio por encima de benchmarks de EE.UU. o Europa. Este KPI permite a las empresas evaluar la competitividad de su paquete de compensación total frente al mercado, y tomar decisiones informadas sobre si es más eficiente incrementar el salario base o ampliar los beneficios voluntarios para mejorar la retención.;Medir la proporción del costo total de la nómina que representa el conjunto de beneficios legales y voluntarios para evaluar la competitividad de la oferta retributiva total frente al mercado, determinar si es más eficiente incrementar el salario base o ampliar los beneficios voluntarios para mejorar la retención, y proporcionar a la dirección financiera una visión completa del costo real de la plantilla más allá del salario bruto reportado en nómina.;(Costo total de beneficios / Costo total de salarios base) _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: semestre 1-2025
+Datos:
+  Costo total salarios base en el semestre:         COP 12.276.000.000
+  Cargas obligatorias (seguridad social 28.5%):     COP 3.498.660.000
+  Prima de servicios (8.33%):                       COP 1.022.591.000
+  Cesantias e intereses (9.33%):                    COP 1.145.351.000
+  Dotacion (3 veces al ano / empleados SML):        COP 183.000.000
+  Beneficios voluntarios (EAP, subsidio alimentos): COP 420.000.000
+  Total beneficios:                                 COP 6.269.602.000
+Calculo:
+  Ratio = (6.269.602.000 / 12.276.000.000) x 100 = 51.1%";"¿Qué proporción del costo total de compensación representa el salario base versus los beneficios adicionales por nivel?
+__ Barras apiladas 100% por nivel salarial (salario base + beneficios) — Una barra por nivel con dos segmentos. La proporción visual muestra si el paquete de compensación es competitivo o si los beneficios son marginales respecto al salario base.";8.0
+48;Horarios y Control de Asistencia;Índice de Flexibilidad Horaria Utilizada (Flexible Schedule Utilization);Mide la adopción real de las modalidades de trabajo flexible habilitadas por la empresa (teletrabajo, horario flexible, jornada comprimida) sobre el universo de empleados elegibles para cada modalidad. La brecha entre elegibles y usuarios reales es el insight central: una política de teletrabajo con 80% de elegibles y 20% de uso indica barreras de implementación o comunicación, no ausencia de demanda. Este KPI es relevante tanto para evaluar el retorno de la inversión en infraestructura de trabajo remoto como para correlacionar la adopción de flexibilidad con indicadores de retención y satisfacción.;Medir la adopción real de las modalidades de trabajo flexible disponibles para identificar la brecha entre la política declarada y la práctica efectiva, con el fin de optimizar el retorno de la inversión en infraestructura de trabajo remoto, detectar barreras de implementación o comunicación que impidan la adopción, y correlacionar la utilización de la flexibilidad con indicadores de retención y satisfacción que justifiquen o recalibre la oferta de modalidades flexibles.;(Empleados que utilizan modalidad flexible / Empleados elegibles para modalidad flexible) _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: Q1 2025 | Alcance: personal de locales y oficinas (400 empleados elegibles)
+Nota: el personal de fabricas (2.600 emp) no es elegible por naturaleza de la operacion en turno fijo.
+Modalidades disponibles y uso:
+  Trabajo remoto (solo para roles administrativos):  Elegibles 100 | Usuarios: 55 -> 55%
+  Horario flexible (entrada entre 7-9am):                     Elegibles 400 | Usuarios: 96 -> 24%
+  Jornada comprimida (4 dias x 12h):                           Elegibles  80 | Usuarios:  8 -> 10";"¿Los empleados están usando las modalidades de trabajo flexible disponibles o hay brecha entre política y práctica real?
+__ Barras agrupadas por modalidad (elegibles vs. usuarios reales) — La brecha entre las dos barras de cada modalidad es el insight clave: una política de teletrabajo con 80% de elegibles y 20% de uso real indica un problema de implementación o comunicación, no de demanda.";8.0
+47;Horarios y Control de Asistencia;Tasa de Puntualidad (On-Time Arrival Rate);Mide el porcentaje de registros de entrada que se producen dentro del margen de tolerancia definido por la empresa sobre el total de jornadas en las que se esperaba presencia efectiva. Es un indicador básico de disciplina operativa que, cuando se segmenta por área y día de la semana, revela patrones estructurales (los lunes y los viernes tienen sistemáticamente menor puntualidad en sectores de conocimiento) o problemas específicos de transporte, gestión del equipo o satisfacción laboral. En sectores con turnos críticos, la impuntualidad tiene impacto directo en la cobertura operativa y la seguridad.;Medir el porcentaje de registros de entrada dentro del margen de tolerancia definido para evaluar la disciplina operativa por área y detectar patrones estructurales de impuntualidad por día de la semana o turno, con el fin de identificar problemas subyacentes de satisfacción, transporte o liderazgo antes de que comprometan la cobertura operativa, especialmente en sectores con turnos críticos donde la impuntualidad tiene consecuencias directas sobre la seguridad y la productividad.;(Registros de entrada puntuales / Total de registros de entrada esperados) _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: febrero 2025 | Fabrica Medellin — turno manana (800 empleados, 20 dias habiles)
+Datos:
+  Total registros de entrada esperados: 800 emp x 20 dias = 16.000
+  Registros puntuales (dentro de 10 min): 13.920
+  Registros con tardanza:                  2.080
+
+Calculo:
+  Tasa = (13.920 / 16.000) x 100 = 87%
+";"¿En qué días de la semana o áreas hay mayor problema de impuntualidad?
+__ Mapa de calor (área _ día de la semana) — Revela el patrón estructural del área sin exponer al individuo. Un área con color consistentemente oscuro en el mismo día tiene un problema crónico. La vista individual va en una tabla filtrable separada, activada solo a demanda del líder directo.";8.0
+45;Horarios y Control de Asistencia;Horas Extra por Empleado (OT Hours per FTE);Complementa la Frecuencia de Horas Extra agregada con una visión individual: cuántas horas extra ha trabajado cada empleado en el periodo y si ese patrón es puntual o sistemático. Permite identificar empleados con sobrecarga crónica que no son visibles en los promedios del área, especialmente en organizaciones donde la distribución de horas extra es muy concentrada en un subgrupo de empleados. Un empleado que supera las 20 horas extra mensuales durante tres meses consecutivos entra en zona de alerta de burnout y debe ser considerado para intervención preventiva por su líder directo y el área de bienestar.;Complementar el indicador agregado de frecuencia de horas extra con una visión individual que identifique empleados con sobrecarga crónica que no son visibles en los promedios del área, con el fin de prevenir el agotamiento severo de perfiles específicos, activar intervenciones de bienestar y redistribución de carga antes de que el patrón derive en baja voluntaria o incapacidad médica prolongada.;_ horas extra del grupo / Número de empleados del grupo;"Empresa: Textiles Andinos S.A.S. | Periodo: noviembre 2025 | Fabrica Bogota — linea de confeccion (50 operarios)
+
+Datos simulados (horas extra en el mes — muestra de 8 operarios representativos):
+  Operario 1:  38 horas extra
+  Operario 2:  42 horas extra
+  Operario 3:  12 horas extra
+  Operario 4:  45 horas extra
+  Operario 5:   8 horas extra
+  Operario 6:  40 horas extra
+  Operario 7:  15 horas extra
+  Operario 8:  36 horas extra
+  Promedio muestra: 236 / 8 = 29.5 h/empleado/mes";"¿Cuáles son las áreas de la empresa con mayor carga de horas extras en la empresa?
+__ Barras horizontales por área ordenadas de mayor a menor promedio de horas extra + línea de referencia vertical en el promedio global de la empresa.
+Una barra por área. La longitud es el promedio de horas extra por empleado en esa área durante el mes. Las áreas con mayor sobrecarga aparecen arriba. La línea vertical del promedio global permite identificar de un vistazo qué áreas están por encima del centro sin que el usuario calcule nada.";8.0
+19;Eficiencia Operativa de RR.HH.;Tasa de Ocupación de Plazas (Vacancy Fill Rate);Indica qué porcentaje de las plazas autorizadas en la estructura organizacional están efectivamente ocupadas por un empleado activo al cierre del periodo. Una tasa inferior al 90% señala que la empresa opera por debajo de su capacidad productiva planificada, lo que puede generar sobrecarga en el personal existente, deterioro del servicio al cliente interno o externo y riesgo de pérdida de ingresos. Es el indicador complementario de la Tasa de Vacantes Abiertas (KPI 64) y debe leerse junto con el Time to Fill (KPI 20) para entender si la brecha es reciente o crónica.;Determinar qué porcentaje de las plazas autorizadas están efectivamente ocupadas al cierre del periodo, con el fin de detectar áreas que operan por debajo de su capacidad productiva planificada, anticipar riesgos de sobrecarga del personal existente y servir como indicador complementario del proceso de adquisición de talento para orientar la priorización de las vacantes de apertura inmediata.;(Plazas ocupadas / Total de plazas autorizadas) _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: cierre noviembre 2025 | Plazas autorizadas: 3.200
+
+Datos:
+  Plazas ocupadas por empleados activos:  3.000
+  Plazas vacantes abiertas:                 200
+  Total plazas autorizadas:               3.200
+Calculo:
+  Tasa global = (3.000 / 3.200) x 100 = 93.75%";"¿Qué porcentaje de nuestras plazas autorizadas están ocupadas y dónde se concentran las vacantes?
+__ Tarjeta KPI de tasa global + barras horizontales por departamento — La tarjeta da el resumen de ocupación de un vistazo. Las barras localizan dónde están las vacantes. La tarjeta sola es insuficiente porque no orienta la acción hacia un área específica.";8.0
+28;Estructura y Demografía;Distribución Demográfica y Diversidad;Muestra la composición porcentual de la plantilla activa por dimensiones demográficas clave: género, rango de edad, tipo de contrato y otras variables relevantes según el contexto del cliente. Permite identificar concentraciones que podrían indicar sesgo en los procesos de selección o promoción, y comparar la distribución interna con la de la Población Económicamente Activa del sector o la región (fuente: DANE GEIH en Colombia). No existe un benchmark de distribución ideal universal, pero las desviaciones significativas respecto a la composición del mercado laboral disponible son señales que justifican revisión de los procesos de atracción y desarrollo.;Mapear la composición de la plantilla por género, rango de edad, tipo de contrato y otras variables demográficas relevantes, con el fin de identificar concentraciones que puedan indicar sesgo en los procesos de selección o promoción, comparar la distribución interna con la Población Económicamente Activa del sector (fuente DANE-GEIH) y sustentar los compromisos de diversidad e inclusión frente a grupos de interés externos.;(Total de empleados del segmento demográfico / Headcount total) _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: cierre 2025 | Headcount: 3.000 empleados
+
+Distribucion de empleados con capacidades diferentes:
+  Discapacitados: 10 empleadas ->0,33%
+  Sin discapacidad: 2.990 empleados -> 99,66%";"¿Cómo está distribuida la plantilla por género y edad en cada área? ¿Hay departamentos con concentraciones que requieran atención?
+__ Barras apiladas al 100% por departamento — Una barra por departamento normalizada al 100%, segmentada por dimensión demográfica. Permite comparar la composición entre áreas de distinto tamaño sin que el volumen distorsione la lectura.";8.0
+27;Estructura y Demografía;Índice de Equidad Salarial por Género (Gender Pay Ratio);Compara el salario promedio de mujeres y hombres dentro del mismo nivel jerárquico o cargo, expresado como un ratio (salario promedio femenino / salario promedio masculino). Un ratio inferior a 0,97 en el mismo nivel y rol indica una brecha que requiere revisión y plan de corrección. Este indicador es relevante tanto por mandato normativo en países con legislación de brecha salarial como por criterios ESG (pilar Social) que los clientes de Midasoft con inversores institucionales deben reportar. La comparación debe hacerse siempre dentro del mismo nivel para aislar el efecto del rol y la antigüedad.;Identificar y cuantificar la brecha salarial entre géneros dentro del mismo nivel o cargo, con el fin de cumplir con los requisitos normativos y de reporte ESG (pilar Social) aplicables a los clientes de Midasoft con inversores institucionales, detectar inequidades internas que aumenten el riesgo de rotación voluntaria o contingencias legales, y fundamentar un plan de corrección objetivo en los procesos de revisión salarial.;Salario promedio de mujeres en el rol X / Salario promedio de hombres en el rol X;"Empresa: Textiles Andinos S.A.S. | Periodo: cierre 2025 | Nivel: operario de confeccion
+
+Datos del nivel:
+  Mujeres en el nivel: 980 operarias | Salario promedio: COP 1.423.500 (SML 2025)
+  Hombres en el nivel: 820 operarios | Salario promedio: COP 1.480.500
+
+Calculo:
+  Ratio = 1.423.500 / 1.480.500 = 0.961";"¿Existe brecha salarial entre géneros en el mismo nivel o cargo?
+__ Barras agrupadas por nivel/cargo con dos series (hombre/mujer) + línea de paridad en 1.0 — La diferencia visual entre las dos barras de cada grupo es el gap. La línea de paridad hace inmediatamente visible qué niveles están en desequilibrio sin que el usuario tenga que calcular la diferencia.";8.0
+9;Desarrollo y Talento;Brecha de Competencias (Skill Gap Index);Cuantifica la diferencia entre el nivel de competencia requerido para cada rol según el perfil de cargo y el nivel de competencia actual demostrado por el empleado en la evaluación de desempeño o de competencias. Expresado en puntos de diferencia sobre la misma escala de evaluación, permite a RRHH identificar qué competencias presentan mayor déficit a nivel organizacional, priorizar los contenidos del plan de formación anual y detectar posibles cuellos de botella para la ejecución de la estrategia de negocio. Es el insumo principal para los planes de desarrollo individual y la planificación de la fuerza laboral a mediano plazo.;Cuantificar la distancia entre el nivel de competencia requerido por cada rol y el nivel actual de los empleados evaluados, con el fin de priorizar los contenidos del plan de formación anual, detectar cuellos de botella para la ejecución de la estrategia de negocio, y fundamentar los planes de desarrollo individual con evidencia objetiva que reduzca el riesgo operativo derivado de déficits de capacidad instalada.;Promedio de (Nivel de competencia requerida para el rol _ Nivel de competencia actual evaluada) por empleado;"Empresa: Textiles Andinos S.A.S. | Periodo: semestre 1-2025 | Alcance: operarios de confeccion fabrica Bogota (400 evaluados) | Escala 1-5
+
+Competencias evaluadas (nivel requerido vs. nivel actual promedio):
+  Manejo de maquinaria de confeccion:  Requerido 4.5 | Actual 4.0 | Brecha 0.5
+  Control de calidad del producto:     Requerido 4.0 | Actual 3.2 | Brecha 0.8
+  Seguridad e higiene industrial:      Requerido 4.5 | Actual 3.0 | Brecha 1.5
+  Lectura de fichas tecnicas:          Requerido 3.5 | Actual 3.4 | Brecha 0.1
+
+Calculo (brecha promedio del grupo):
+Brecha promedio = (0.5 + 0.8 + 1.5 + 0.1)= 2.9 / 4 = 0.725";"¿En qué competencias hay mayor brecha entre el nivel requerido y el nivel actual por área o cargo?
+__ Gráfico de radar con doble polígono (requerido vs. actual) — Polígono exterior = nivel requerido, polígono interior = nivel actual. La diferencia entre ambas superficies es la brecha. Alternativa nativa: barras agrupadas por competencia con dos series.";8.0
+3;Clima Laboral y Bienestar;Índice de Bienestar (Wellbeing Index);"Score compuesto que integra cuatro dimensiones del bienestar del empleado (físico, mental, satisfacción laboral y percepción del liderazgo), medidas mediante encuesta y ponderadas según el modelo Gallup Q12 (pesos orientativos: D1=0,20; D2=0,30; D3=0,30; D4=0,20). El resultado en escala 1–10 permite a RRHH identificar en qué dimensión hay mayor déficit, priorizar programas de intervención (EAP, pausas activas, formación de líderes) y correlacionar el bienestar con indicadores de rotación y desempeño. Al agregar múltiples señales en un único número, facilita la comunicación ejecutiva y el seguimiento de tendencias entre ciclos de medición.";Medir de forma integral el estado de bienestar físico, mental, laboral y relacional de la plantilla para que RRHH pueda priorizar inversiones en programas de salud ocupacional, EAP y liderazgo consciente, y para correlacionar el bienestar organizacional con indicadores de productividad, retención y ausentismo en las conversaciones con la dirección financiera.;[(D1_w1)+(D2_w2)+(D3_w3)+(D4_w4)] / (w1+w2+w3+w4);"Empresa: Textiles Andinos S.A.S. | Periodo: semestre 1-2025 | Respondieron: 2.100 empleados
+
+Pesos Gallup Q12: D1=0.20 | D2=0.30 | D3=0.30 | D4=0.20
+
+Resultados promedio por dimension (escala 0-10):
+  D1 — Bienestar fisico:         6.0
+  D2 — Bienestar mental:         5.4
+  D3 — Satisfaccion laboral:     6.2
+  D4 — Liderazgo percibido:      6.8
+
+Calculo:
+  Score = (6.0x0.20) + (5.4x0.30) + (6.2x0.30) + (6.8x0.20)
+        = 1.20 + 1.62 + 1.86 + 1.36
+        = 6.04 / 10
+
+RESULTADO: 6.04 / 10";"¿Cuál es el perfil de bienestar de la organización y en qué dimensión hay mayor déficit respecto al ideal?
+__ Gráfico de radar (araña) con doble polígono — Los 4 ejes (físico, mental, satisfacción, liderazgo) permiten ver de un vistazo la forma del bienestar organizacional. La brecha entre el polígono real y el ideal es el hallazgo accionable. Alternativa nativa sin AppSource: barras agrupadas por dimensión con dos series.";8.0
+64;Plazas y Gestión de Vacantes;Tasa de Vacantes Abiertas (Open Position Rate);Cuantifica el porcentaje de plazas autorizadas que están actualmente sin cubrir, incluyendo todas las vacantes en cualquier etapa del proceso de reclutamiento. Es un indicador de tensión entre la capacidad de reposición del área de adquisición de talento y la velocidad de pérdida de empleados. Una tasa superior al 10% indica un cuello de botella estructural en reclutamiento o una rotación que supera la velocidad de reposición. Debe leerse junto con el Time to Fill (KPI 20) para determinar si el problema es de atracción (pocos candidatos) o de proceso (muchos candidatos pero proceso lento).;Cuantificar el porcentaje de plazas autorizadas que están actualmente sin cubrir en cualquier etapa del proceso de reclutamiento, con el fin de medir la tensión entre la velocidad de pérdida de empleados y la capacidad de reposición del área de adquisición de talento.;(Plazas vacantes abiertas / Total de plazas autorizadas) _ 100;"Empresa: Textiles Andinos S.A.S. | Periodo: cierre noviembre 2025 | Plazas autorizadas: 3.200
+Datos:
+  Plazas ocupadas:     3.000
+  Plazas vacantes:       200
+  Total autorizadas:   3.200
+Calculo:
+  Tasa = (200 / 3.200) x 100 = 6.25%";"¿Qué porcentaje de las plazas autorizadas están sin cubrir en este momento y dónde se concentran las vacantes abiertas?
+__ Tarjeta KPI de tasa global + barras horizontales por departamento — La tarjeta comunica el estado general de cobertura. Las barras por departamento localizan dónde está el problema. La tarjeta sola es insuficiente porque no orienta la acción hacia un área específica.";8.0

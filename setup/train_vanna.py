@@ -16,8 +16,19 @@ import sqlite3
 import pandas as pd
 import google.genai as genai
 from dotenv import load_dotenv
-from vanna.legacy.chromadb.chromadb_vector import ChromaDB_VectorStore
 from vanna.legacy.base.base import VannaBase
+
+# ChromaDB es OPCIONAL: solo se necesita para entrenar localmente (main()) o para
+# correr el dashboard con USE_CHROMA=1. El deploy importa este módulo únicamente
+# por el corpus (DDL/DOCUMENTATION/EXAMPLES) y NO debe requerir chromadb.
+try:
+    from vanna.legacy.chromadb.chromadb_vector import ChromaDB_VectorStore
+    CHROMA_AVAILABLE = True
+except ImportError:
+    class ChromaDB_VectorStore:     # placeholder: la clase nunca se instancia sin chromadb
+        def __init__(self, config=None):
+            raise RuntimeError("chromadb no está instalado — pip install chromadb")
+    CHROMA_AVAILABLE = False
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -57,9 +68,13 @@ class HRCopilot(ChromaDB_VectorStore, VannaBase):
             if isinstance(prompt, list) else str(prompt)
         )
         text += (
-            "\n\nIMPORTANT: The database has exactly 4 tables: "
-            "employees, departments, job_roles, satisfaction. "
-            "Always use lowercase table names. Never invent table names."
+            "\n\nIMPORTANT: The database has these 18 tables (lowercase): "
+            "employees, departments, job_roles, satisfaction (core); "
+            "employment_dates, attendance_monthly, medical_leaves, payroll_monthly, "
+            "payroll_runs, salary_bands, headcount_history, vacancies, survey_cycles, "
+            "survey_responses, training_programs, training_participants, "
+            "company_financials, vacation_balances (monthly series 2024-06..2026-05). "
+            "Never invent table names. month columns are TEXT 'YYYY-MM'."
         )
         response = self._client.models.generate_content(
             model=self.model_name,
@@ -720,6 +735,117 @@ KPI_EXAMPLES = [
 ]
 
 
+# ── Tablas sintéticas (build_synthetic_data.py) ───────────────────────────────
+# DDL + documentación + ejemplos para que el copiloto consulte asistencia,
+# nómina, vacantes, encuestas y capacitación. Ventana: 2024-06 a 2026-05.
+DDL_SYNTH = """
+CREATE TABLE employment_dates (
+    employee_id INTEGER PRIMARY KEY REFERENCES employees(employee_id),
+    hire_date TEXT,   -- 'YYYY-MM-DD'
+    exit_date TEXT,   -- NULL = sigue activo
+    exit_type TEXT    -- 'voluntary' | 'involuntary' | NULL
+);
+CREATE TABLE attendance_monthly (
+    employee_id INTEGER REFERENCES employees(employee_id),
+    month TEXT,       -- 'YYYY-MM', de 2024-06 a 2026-05
+    scheduled_days INTEGER, absence_days INTEGER,
+    regular_hours REAL, overtime_hours REAL, late_arrivals INTEGER
+);
+CREATE TABLE medical_leaves (
+    employee_id INTEGER, start_date TEXT, days INTEGER,
+    leave_type TEXT   -- 'Enfermedad General (EPS)' | 'Accidente de Trabajo (ARL)' | 'Enfermedad Laboral (ARL)'
+);
+CREATE TABLE payroll_monthly (
+    employee_id INTEGER, month TEXT,
+    base_salary REAL, benefits REAL, employer_contributions REAL,
+    overtime_pay REAL, total_cost REAL  -- USD
+);
+CREATE TABLE payroll_runs (
+    month TEXT, scheduled_pay_date TEXT, actual_pay_date TEXT,
+    payslips_total INTEGER, payslips_with_errors INTEGER
+);
+CREATE TABLE salary_bands (job_level INTEGER, band_min REAL, band_mid REAL, band_max REAL);
+CREATE TABLE headcount_history (
+    month TEXT, department_id INTEGER REFERENCES departments(department_id),
+    headcount INTEGER, hires INTEGER, exits_voluntary INTEGER, exits_involuntary INTEGER
+);
+CREATE TABLE vacancies (
+    vacancy_id INTEGER, department_id INTEGER, role_id INTEGER, job_level INTEGER,
+    opened_date TEXT, closed_date TEXT,   -- NULL = vacante abierta
+    monthly_salary REAL, productivity_factor REAL,
+    offers_extended INTEGER, offers_accepted INTEGER,
+    filled_by TEXT,        -- 'internal' | 'external' | NULL
+    quality_of_hire REAL   -- 0-100
+);
+CREATE TABLE survey_cycles (cycle TEXT, survey_date TEXT, invited INTEGER);  -- cycle: '2025Q1'
+CREATE TABLE survey_responses (
+    employee_id INTEGER, cycle TEXT,
+    q_pride INTEGER, q_recommend_nps INTEGER,  -- q_recommend_nps: 0-10 (eNPS)
+    q_effort INTEGER, q_stay INTEGER, q_satisfaction INTEGER  -- Likert 1-5 / 0-10
+);
+CREATE TABLE training_programs (
+    program_id INTEGER, program_name TEXT, category TEXT, program_date TEXT, cost_usd INTEGER
+);
+CREATE TABLE training_participants (
+    program_id INTEGER, employee_id INTEGER, perf_score_pre REAL, perf_score_post REAL  -- escala 1-5
+);
+CREATE TABLE company_financials (month TEXT, operating_revenue REAL);
+CREATE TABLE vacation_balances (
+    employee_id INTEGER, accrued_days INTEGER, taken_days INTEGER, pending_days INTEGER
+);
+"""
+
+SYNTH_DOCUMENTATION = """
+Synthetic HR time-series tables (window: 2024-06 through 2026-05, 24 months):
+- month columns are TEXT 'YYYY-MM'. ORDER BY month works chronologically.
+- employment_dates: exit_date IS NULL means the employee is still active today.
+- Absenteeism rate (%) = 100.0*SUM(absence_days)/SUM(scheduled_days) from attendance_monthly.
+- Overtime rate (%) = 100.0*SUM(overtime_hours)/SUM(regular_hours).
+- eNPS per cycle = 100*promoters(q_recommend_nps>=9)/total - 100*detractors(q_recommend_nps<=6)/total.
+- Time to Fill (days) = julianday(closed_date)-julianday(opened_date) on vacancies with closed_date NOT NULL.
+- Turnover/hires trends come from headcount_history (already aggregated by month and department).
+- Labor cost ratio (%) = 100*SUM(payroll_monthly.total_cost)/company_financials.operating_revenue joined by month.
+- Training effectiveness (%) per program = 100*(AVG(perf_score_post)-AVG(perf_score_pre))/AVG(perf_score_pre).
+- Quarter of a month string: substr(month,1,4) || '-Q' || ((CAST(substr(month,6,2) AS INTEGER)+2)/3).
+- Join aliases: attendance_monthly a, payroll_monthly p, medical_leaves ml, vacancies v,
+  headcount_history hh, survey_responses sr, employment_dates ed.
+- Questions about evolution/trend/tendencia/mensual should GROUP BY month and ORDER BY month.
+"""
+
+SYNTH_EXAMPLES = [
+    {"question": "¿Cómo ha evolucionado el headcount mes a mes?",
+     "sql": "SELECT month, SUM(headcount) AS headcount FROM headcount_history GROUP BY month ORDER BY month;"},
+    {"question": "¿Cuál es la tasa de ausentismo mensual?",
+     "sql": "SELECT month, ROUND(100.0*SUM(absence_days)/SUM(scheduled_days), 2) AS absenteeism_rate_pct FROM attendance_monthly GROUP BY month ORDER BY month;"},
+    {"question": "Ingresos y egresos de personal por mes",
+     "sql": "SELECT month, SUM(hires) AS hires, SUM(exits_voluntary + exits_involuntary) AS exits FROM headcount_history GROUP BY month ORDER BY month;"},
+    {"question": "Horas extra promedio por mes y departamento",
+     "sql": "SELECT a.month, d.department_name, ROUND(AVG(a.overtime_hours), 1) AS avg_overtime_hours FROM attendance_monthly a JOIN employees e ON a.employee_id = e.employee_id JOIN departments d ON e.department_id = d.department_id GROUP BY a.month, d.department_name ORDER BY a.month;"},
+    {"question": "¿Cuántas incapacidades hay por tipo?",
+     "sql": "SELECT leave_type, COUNT(*) AS total_leaves, SUM(days) AS total_days FROM medical_leaves GROUP BY leave_type ORDER BY total_leaves DESC;"},
+    {"question": "¿Cuál es el eNPS por ciclo de encuesta?",
+     "sql": "SELECT cycle, ROUND(100.0*SUM(q_recommend_nps >= 9)/COUNT(*) - 100.0*SUM(q_recommend_nps <= 6)/COUNT(*), 1) AS enps FROM survey_responses GROUP BY cycle ORDER BY cycle;"},
+    {"question": "Tiempo promedio de cobertura de vacantes por departamento",
+     "sql": "SELECT d.department_name, ROUND(AVG(julianday(v.closed_date) - julianday(v.opened_date)), 0) AS avg_days_to_fill FROM vacancies v JOIN departments d ON v.department_id = d.department_id WHERE v.closed_date IS NOT NULL GROUP BY d.department_name ORDER BY avg_days_to_fill DESC;"},
+    {"question": "¿Qué porcentaje de los ingresos se gasta en nómina cada mes?",
+     "sql": "SELECT p.month, ROUND(100.0*SUM(p.total_cost)/f.operating_revenue, 1) AS labor_cost_ratio_pct FROM payroll_monthly p JOIN company_financials f ON p.month = f.month GROUP BY p.month ORDER BY p.month;"},
+    {"question": "Salidas voluntarias vs involuntarias por mes",
+     "sql": "SELECT month, SUM(exits_voluntary) AS voluntary, SUM(exits_involuntary) AS involuntary FROM headcount_history GROUP BY month ORDER BY month;"},
+    {"question": "Compa-ratio promedio por nivel de cargo",
+     "sql": "SELECT e.JobLevel, ROUND(AVG(1.0*e.MonthlyIncome/b.band_mid), 2) AS avg_compa_ratio FROM employees e JOIN salary_bands b ON e.JobLevel = b.job_level GROUP BY e.JobLevel ORDER BY e.JobLevel;"},
+    {"question": "¿Qué programas de capacitación mejoraron más el desempeño?",
+     "sql": "SELECT tp.program_name, ROUND(100.0*(AVG(t.perf_score_post)-AVG(t.perf_score_pre))/AVG(t.perf_score_pre), 1) AS improvement_pct FROM training_participants t JOIN training_programs tp ON t.program_id = tp.program_id GROUP BY tp.program_name ORDER BY improvement_pct DESC;"},
+    {"question": "¿Cuántas vacantes abiertas hay por departamento?",
+     "sql": "SELECT d.department_name, COUNT(*) AS open_vacancies FROM vacancies v JOIN departments d ON v.department_id = d.department_id WHERE v.closed_date IS NULL GROUP BY d.department_name ORDER BY open_vacancies DESC;"},
+    {"question": "Participación en las encuestas de clima por ciclo",
+     "sql": "SELECT sr.cycle, ROUND(100.0*COUNT(*)/sc.invited, 1) AS participation_pct FROM survey_responses sr JOIN survey_cycles sc ON sr.cycle = sc.cycle GROUP BY sr.cycle ORDER BY sr.cycle;"},
+    {"question": "Relación entre ausentismo y horas extra por empleado",
+     "sql": "SELECT employee_id, SUM(absence_days) AS total_absence_days, SUM(overtime_hours) AS total_overtime_hours FROM attendance_monthly GROUP BY employee_id;"},
+    {"question": "Costo de nómina mensual desglosado por concepto",
+     "sql": "SELECT month, ROUND(SUM(base_salary), 0) AS base, ROUND(SUM(benefits), 0) AS benefits, ROUND(SUM(employer_contributions), 0) AS contributions, ROUND(SUM(overtime_pay), 0) AS overtime FROM payroll_monthly GROUP BY month ORDER BY month;"},
+]
+
+
 # ── Plotly Visualization Examples ─────────────────────────────────────────────
 # These teach Gemini the correct chart type for each data shape.
 # Each entry pairs a question+SQL result shape with the CORRECT Plotly code.
@@ -1361,6 +1487,11 @@ fig.update_layout(xaxis_title='', yaxis_title='Score (1–4)',
 if __name__ == "__main__":
     print("\n── HR Copilot — Vanna Training ──────────────────────────────")
 
+    if not CHROMA_AVAILABLE:
+        print("ERROR: chromadb no está instalado (el entrenamiento es solo local).")
+        print("Instálalo con: pip install chromadb")
+        sys.exit(1)
+
     if not os.path.exists(DB_PATH):
         print(f"ERROR: Database not found at {DB_PATH}")
         print("Run setup/build_database.py first.")
@@ -1379,13 +1510,15 @@ if __name__ == "__main__":
     vn.run_sql_is_set = True
     print("  Vanna initialized.")
 
-    print("\n[2/5] Training with DDL schema...")
+    print("\n[2/5] Training with DDL schema (core + synthetic)...")
     vn.train(ddl=DDL)
+    vn.train(ddl=DDL_SYNTH)
     print("  DDL trained.")
 
     print("\n[3/5] Training with business documentation...")
     vn.train(documentation=DOCUMENTATION)
     vn.train(documentation=KPI_DOCUMENTATION)
+    vn.train(documentation=SYNTH_DOCUMENTATION)
     print("  Documentation trained.")
 
     print("\n[4/5] Training with SQL examples...")
@@ -1396,6 +1529,10 @@ if __name__ == "__main__":
     for ex in KPI_EXAMPLES:
         vn.train(question=ex["question"], sql=ex["sql"])
     print(f"  {len(KPI_EXAMPLES)} KPI examples trained.")
+
+    for ex in SYNTH_EXAMPLES:
+        vn.train(question=ex["question"], sql=ex["sql"])
+    print(f"  {len(SYNTH_EXAMPLES)} synthetic-table examples trained.")
 
     print("\n[5/5] Training with Plotly visualization rules and examples...")
     # Train the visualization rules as documentation so Gemini internalizes them
@@ -1420,7 +1557,7 @@ if __name__ == "__main__":
         )
     print(f"  {len(PLOTLY_EXAMPLES)} Plotly examples trained.")
 
-    total = len(EXAMPLES) + len(KPI_EXAMPLES) + len(PLOTLY_EXAMPLES)
+    total = len(EXAMPLES) + len(KPI_EXAMPLES) + len(SYNTH_EXAMPLES) + len(PLOTLY_EXAMPLES)
     print(f"\n  Total training entries: {total} examples + 3 documentation blocks")
     print(f"  ChromaDB saved to: {CHROMA_DIR}")
     print("\n── Training complete. You can now run: python app/dashboard.py ──\n")

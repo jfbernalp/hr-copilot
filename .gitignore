@@ -18,20 +18,10 @@ __pycache__/
 .coverage
 htmlcov/
 
-# Bases de datos vectoriales / Basura
+# Bases de datos vectoriales / temporales
+chroma_db/
 chroma.sqlite3
-app/hr_database.db
+*.db-journal
 
 # Ignorar archivos PDF pesados y manuales
 *.pdf
-
-# Scripts temporales de refactorización y pruebas
-apply_kpis.py
-fix_syntax.py
-generate_pdf.py
-refactor_analytics.py
-rewrite_analytics.py
-rewrite_app.py
-rewrite_ui.py
-test_vanna_base.py
-dashboard_v0.01.py

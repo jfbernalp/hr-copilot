@@ -1,6 +1,7 @@
+# Dependencias del deploy (Render Free — modo RAG estático, SIN ChromaDB).
+# El entrenamiento es solo local: pip install chromadb && python setup/train_vanna.py
 vanna>=0.1.0
 google-genai>=1.0.0
-chromadb>=0.5.0
 plotly>=5.0.0
 dash>=2.0.0
 pandas>=2.0.0

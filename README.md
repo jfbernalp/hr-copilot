@@ -52,3 +52,51 @@ A través de un motor avanzado de **Text-to-SQL**, los usuarios pueden hacer pre
 
 ---
 *Desarrollado para la transformación digital en la analítica de Recursos Humanos.*
+
+## 🚦 Cómo correr el laboratorio
+
+```bash
+source .venv/bin/activate
+python setup/build_database.py        # 1. BD base IBM (si no existe)
+python setup/build_synthetic_data.py  # 2. Tablas sintéticas (asistencia, nómina, vacantes...)
+python setup/seed_users.py            # 3. Usuarios demo
+python app/dashboard.py               # 4. → http://127.0.0.1:8051
+```
+
+Variables en `.env`: `GEMINI_API_KEY` (obligatoria), `SECRET_KEY` (sesiones; se genera
+una en el primer setup), `USE_CHROMA=1` (opcional: RAG con ChromaDB local, requiere
+correr antes `python setup/train_vanna.py`).
+
+## 👤 Usuarios demo (solo laboratorio)
+
+| Usuario | Contraseña | Rol | Alcance |
+|---|---|---|---|
+| `admin` | `Praxedes2026!` | hr_admin | Todo + página de métricas |
+| `sales.manager` | `Sales2026!` | sales_manager | Solo departamento Sales |
+| `rd.manager` | `RD2026!` | rd_manager | Solo departamento R&D |
+| `viewer` | `Viewer2026!` | employee_viewer | Sin cifras salariales |
+
+5 intentos fallidos bloquean la cuenta por 5 minutos. La sesión vive en el servidor
+(cookie firmada con `SECRET_KEY`); "Salir →" la destruye.
+
+## 🧪 Tests
+
+```bash
+python tests/ai_regression.py   # 14 preguntas canónicas: SQL + tipo de gráfico + paleta
+```
+
+## ☁️ Deploy en Render (Free Tier)
+
+El dashboard corre en **modo RAG estático**: todo el corpus de entrenamiento viaja en el
+prompt de cada consulta (~8.5K tokens ≈ $0.0006/consulta con Gemini Flash). **ChromaDB no
+se instala ni se carga en el servidor** — eso eliminó el OOM del plan gratuito (el
+dashboard usa ~170 MB de los 512 MB disponibles). El entrenamiento vectorial es opcional
+y solo local (`pip install chromadb && python setup/train_vanna.py` + `USE_CHROMA=1`).
+
+Pasos:
+1. Push del repo (la BD `data/hr_analytics.db` con datos sintéticos y usuarios va incluida).
+2. En Render: Web Service → Python, build `pip install -r requirements.txt`,
+   start command tomado del `Procfile`.
+3. Variables de entorno: `GEMINI_API_KEY` y `SECRET_KEY` (obligatorias).
+4. Nota: el filesystem de Render Free es efímero — `usage_metrics`, el caché de consultas
+   y la auditoría RLS se reinician con cada deploy (aceptable para el laboratorio).

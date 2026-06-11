@@ -114,7 +114,9 @@ DB_PATH    = os.path.join(BASE_DIR, "data", "hr_analytics.db")
 
 ## Base de datos: hr_analytics.db
 
-Datos IBM HR — 1,470 empleados. **4 tablas exactas** (nunca inventar otras):
+Datos IBM HR — 1,470 empleados. **4 tablas núcleo** (abajo) + **14 tablas sintéticas**
+generadas por `setup/build_synthetic_data.py` (ver sección "Tablas sintéticas"). No
+inventar tablas fuera de esas 18.
 
 ```sql
 CREATE TABLE departments (
@@ -174,6 +176,28 @@ CREATE TABLE satisfaction (
 - 3 departamentos: 'Sales', 'Research & Development', 'Human Resources'.
 - Todos los salarios en USD.
 - JOIN siempre con alias: `employees e`, `departments d`, `job_roles jr`, `satisfaction s`.
+
+### Tablas sintéticas (para el dashboard de KPIs del catálogo kpi_catalog.csv)
+
+Generadas con seed fija (42) por `setup/build_synthetic_data.py` — re-correr ese script
+las regenera idénticas. Ventana temporal: **2024-06 a 2026-05** (24 meses). Coherencia:
+cada empleado tiene `hire_date`/`exit_date` en `employment_dates` (los Attrition='Yes'
+salen dentro de la ventana) y asistencia/nómina solo existen en sus meses activos.
+
+| Tabla | Grano | Columnas clave | KPIs que habilita |
+|---|---|---|---|
+| `employment_dates` | empleado | hire_date, exit_date, exit_type | antigüedad, rotación |
+| `attendance_monthly` | empleado×mes | scheduled_days, absence_days, regular_hours, overtime_hours, late_arrivals | ausentismo, overtime rate, puntualidad |
+| `medical_leaves` | incapacidad | start_date, days, leave_type (EPS/ARL) | incapacidades, tasa de incidentes |
+| `payroll_monthly` | empleado×mes | base_salary, benefits, employer_contributions, overtime_pay, total_cost | costo por FTE, índice horas extra, incremento salarial |
+| `payroll_runs` | mes | scheduled/actual_pay_date, payslips_with_errors | puntualidad de pago, error rate |
+| `salary_bands` | job_level | band_min/mid/max | compa-ratio |
+| `headcount_history` | mes×depto | headcount, hires, exits_voluntary/involuntary | headcount trend, turnover, hiring rate |
+| `vacancies` | vacante | opened/closed_date, monthly_salary, offers_extended/accepted, filled_by, quality_of_hire | time to fill, cost of vacancy, offer acceptance, promoción interna |
+| `survey_cycles` + `survey_responses` | ciclo trimestral / respuesta | invited; q_pride, q_recommend_nps (0-10), q_effort, q_stay, q_satisfaction | engagement, eNPS, participación |
+| `training_programs` + `training_participants` | programa / participante | perf_score_pre/post, cost_usd | efectividad de capacitación |
+| `company_financials` | mes | operating_revenue | labor cost ratio, revenue per labor cost |
+| `vacation_balances` | empleado activo | accrued/taken/pending_days | vacation liability |
 
 ---
 
@@ -404,9 +428,11 @@ print(f'Fragmentos en ChromaDB: {len(df)}')
 - [x] ChromaDB entrenado con DDL + documentación + ejemplos SQL + ejemplos Plotly
 - [x] Dashboard Dash funcional en puerto 8051
 - [x] Paleta de colores Práxedes aplicada en entrenamiento y dashboard
-- [x] Interceptor RLS implementado (`app/rls.py`) e integrado en el dashboard con selector de rol en la UI
-- [ ] Sistema de sesiones/autenticación real para RLS (actualmente selector manual en UI — válido para laboratorio)
-- [ ] Caché de consultas mejorado (nivel 3 persistente)
+- [x] Interceptor RLS (`app/rls.py`): filtro de depto según el grano de cada tabla + bloqueo salarial extendido a nómina sintética; auditoría con username
+- [x] Login real: `app/auth.py` (pbkdf2 stdlib + rate-limit 5 intentos/5 min) + tabla `users` (`setup/seed_users.py`) + sesión server-side Flask (`SECRET_KEY` en .env). Usuarios demo: admin / sales.manager / rd.manager / viewer (contraseñas en setup/seed_users.py)
+- [x] Página /metrics: tokens, costo, proyección mensual, latencia, tasa de caché, por rol — solo hr_admin
+- [x] Dashboard estático /kpis: 44 KPIs del catálogo en 9 hojas (Resumen + 8 categorías) con segmentadores
+- [ ] Caché de consultas mejorado (nivel 3 persistente con TTL)
 - [ ] Conectar BD más compleja (AdventureWorks o similar multi-tabla)
 
 ---
