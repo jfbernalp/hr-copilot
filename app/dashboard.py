@@ -17,7 +17,8 @@ import sys
 import json
 import time
 import hashlib
-import sqlite3
+import psycopg2
+import psycopg2.extras
 from datetime import datetime
 import pandas as pd
 import numpy as np
@@ -25,12 +26,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
 from plotly.subplots import make_subplots
-import google.genai as genai
 import dash
 from dash import dcc, html, Input, Output, State, callback_context, ALL
 from dash.exceptions import PreventUpdate
 from dotenv import load_dotenv
-from vanna.legacy.base.base import VannaBase
 
 # ── Paths & Config ─────────────────────────────────────────────────────────────
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -39,15 +38,11 @@ BASE_DIR    = (
     if os.path.basename(_SCRIPT_DIR) == "app"
     else _SCRIPT_DIR
 )
-DB_PATH    = os.path.join(BASE_DIR, "data", "hr_analytics.db")
 CHROMA_DIR = os.path.join(BASE_DIR, "chroma_db")
 
 sys.path.insert(0, _SCRIPT_DIR)
 sys.path.insert(0, BASE_DIR)
 from rls import rls_intercept, ROLES, DEPT_NAMES
-from setup.train_vanna import (DDL, DDL_SYNTH, DOCUMENTATION, KPI_DOCUMENTATION,
-                               SYNTH_DOCUMENTATION, VISUALIZATION_DOCUMENTATION,
-                               EXAMPLES, KPI_EXAMPLES, SYNTH_EXAMPLES)
 import kpi_catalog
 import flask
 from auth import check_login
@@ -55,122 +50,153 @@ from auth import check_login
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 if not API_KEY:
-    print("ERROR: No API key found. Add GEMINI_API_KEY or GOOGLE_API_KEY to .env")
+    print("ERROR: No API key found. Add GEMINI_API_KEY o GOOGLE_API_KEY en .env")
     sys.exit(1)
 
 COST_INPUT_PER_1M  = 0.075
 COST_OUTPUT_PER_1M = 0.30
 
 
-# ── Vanna + Gemini ─────────────────────────────────────────────────────────────
-class HRCopilot(VannaBase):
-    def __init__(self, config=None):
-        VannaBase.__init__(self, config=config)
-        self._client    = genai.Client(api_key=config.get("api_key"))
-        self.model_name = config.get("model", "gemini-2.5-flash")
-        self.last_input_tokens = self.last_output_tokens = self.last_total_tokens = 0
+# ── Vanna + Gemini (ChromaDB) ──────────────────────────────────────────────────
+# La clase HRCopilot con ChromaDB vive en train_vanna_postgres.py.
+# Aquí la importamos para que el dashboard use el RAG entrenado.
+from setup.train_vanna_postgres import HRCopilot
 
-    def system_message(self, message): return message
-    def user_message(self, message):   return message
-    def assistant_message(self, message): return message
+# ── Conexión PostgreSQL ────────────────────────────────────────────────────────
+# Wrapper compatible con el patrón conn.execute() que usa el resto del código.
+class _PGConn:
+    """psycopg2 wrapper con interfaz compatible con sqlite3 (conn.execute / conn.commit).
+    Usa autocommit=True para evitar el error 'transaction aborted' cuando un query
+    falla (el estado de error en PostgreSQL bloquea todo lo siguiente en la misma conexión)."""
+    def __init__(self, **kwargs):
+        self._c = psycopg2.connect(**kwargs)
+        self._c.autocommit = True   # cada statement es su propia transacción implícita
 
-    def generate_embedding(self, data, **kwargs): return [0.0]
-    def get_related_ddl(self, question, **kwargs): return [DDL, DDL_SYNTH]
-    def get_related_documentation(self, question, **kwargs): return [DOCUMENTATION, KPI_DOCUMENTATION, SYNTH_DOCUMENTATION, VISUALIZATION_DOCUMENTATION]
-    def get_similar_question_sql(self, question, **kwargs): return EXAMPLES + KPI_EXAMPLES + SYNTH_EXAMPLES
-    def add_ddl(self, ddl, **kwargs): pass
-    def add_documentation(self, documentation, **kwargs): pass
-    def add_question_sql(self, question, sql, **kwargs): pass
-    def remove_training_data(self, id, **kwargs): pass
-    def get_training_data(self, **kwargs): return pd.DataFrame()
-
-    def submit_prompt(self, prompt, **kwargs):
-        text = (
-            "\n".join([p if isinstance(p, str) else str(p) for p in prompt])
-            if isinstance(prompt, list) else str(prompt)
-        )
-        text += (
-            "\n\nIMPORTANT: The database has these 18 tables (lowercase): "
-            "employees, departments, job_roles, satisfaction (core); "
-            "employment_dates, attendance_monthly, medical_leaves, payroll_monthly, "
-            "payroll_runs, salary_bands, headcount_history, vacancies, survey_cycles, "
-            "survey_responses, training_programs, training_participants, "
-            "company_financials, vacation_balances (monthly series 2024-06..2026-05). "
-            "Never invent table names. month columns are TEXT 'YYYY-MM'."
-        )
-        response = self._client.models.generate_content(
-            model=self.model_name,
-            contents=text,
-            config=genai.types.GenerateContentConfig(
-                thinking_config=genai.types.ThinkingConfig(thinking_budget=0)
-            )
-        )
+    def execute(self, sql, params=()):
+        cur = self._c.cursor()
         try:
-            self.last_input_tokens  = response.usage_metadata.prompt_token_count
-            self.last_output_tokens = response.usage_metadata.candidates_token_count
-            self.last_total_tokens  = response.usage_metadata.total_token_count
+            cur.execute(sql, params or ())
         except Exception:
-            pass
-        return response.text
+            pass   # con autocommit no hay transacción colgada que limpiar
+        return cur
+
+    def commit(self):   pass   # no-op con autocommit
+    def rollback(self): pass   # no-op con autocommit
+
+    def close(self):
+        self._c.close()
+
+    def cursor(self):
+        return self._c.cursor()
 
 
-# ── Initialize Vanna ───────────────────────────────────────────────────────────
-print("Initializing HR Copilot — Práxedes Edition...")
+# ── Initialize Vanna + DB ──────────────────────────────────────────────────────
+print("Inicializando HR Copilot — NovaTech Colombia…")
 
 def _make_copilot():
-    """RAG dual-mode. USE_CHROMA=1 → ChromaDB local (recupera top-K fragmentos,
-    menos tokens por consulta). Default → modo estático: todo el corpus viaja en
-    cada prompt (sin ChromaDB en memoria; apto para Render Free Tier)."""
-    cfg = {"api_key": API_KEY, "model": "gemini-2.5-flash",
+    """Usa ChromaDB por defecto (Hetzner tiene RAM suficiente).
+    Fallback a modo estático si ChromaDB no está disponible."""
+    cfg = {"api_key": API_KEY, "model": "gemini-3.6-flash",
            "chroma_persist_directory": CHROMA_DIR}
-    if os.getenv("USE_CHROMA", "0") == "1":
-        try:
-            from setup.train_vanna import HRCopilot as ChromaCopilot
-            v = ChromaCopilot(config=cfg)
-            if len(v.get_training_data()) == 0:
-                raise RuntimeError("ChromaDB vacío — corre: python setup/train_vanna.py")
-            print("  RAG: ChromaDB activo (" + CHROMA_DIR + ")")
-            return v
-        except Exception as exc:
-            print(f"  RAG: ChromaDB no disponible ({exc}); usando modo estático")
-    return HRCopilot(config=cfg)
+    try:
+        v = HRCopilot(config=cfg)
+        n = len(v.get_training_data())
+        if n == 0:
+            raise RuntimeError("ChromaDB vacío — corre: python setup/train_vanna_postgres.py")
+        print(f"  RAG: ChromaDB activo ({n} fragmentos en {CHROMA_DIR})")
+        return v
+    except Exception as exc:
+        print(f"  RAG: ChromaDB no disponible ({exc}); usando modo estático")
+        from vanna.legacy.base.base import VannaBase
+        import google.genai as genai
+        from setup.train_vanna_postgres import DDL_VISTAS, DOCUMENTACION, EJEMPLOS
+
+        class _StaticCopilot(VannaBase):
+            def __init__(self, config=None):
+                VannaBase.__init__(self, config=config)
+                self._client    = genai.Client(api_key=config.get("api_key"))
+                self.model_name = config.get("model", "gemini-3.6-flash")
+                self.last_input_tokens = self.last_output_tokens = self.last_total_tokens = 0
+            def system_message(self, m): return m
+            def user_message(self, m):   return m
+            def assistant_message(self, m): return m
+            def generate_embedding(self, d, **kw): return [0.0]
+            def get_related_ddl(self, q, **kw): return [DDL_VISTAS]
+            def get_related_documentation(self, q, **kw): return [DOCUMENTACION]
+            def get_similar_question_sql(self, q, **kw): return [f"{p}\n{s}" for p, s in EJEMPLOS]
+            def add_ddl(self, *a, **kw): pass
+            def add_documentation(self, *a, **kw): pass
+            def add_question_sql(self, *a, **kw): pass
+            def remove_training_data(self, *a, **kw): pass
+            def get_training_data(self, **kw): return pd.DataFrame()
+            def submit_prompt(self, prompt, **kwargs):
+                import google.genai as _genai
+                text = ("\n".join([p if isinstance(p, str) else str(p) for p in prompt])
+                        if isinstance(prompt, list) else str(prompt))
+                text += (
+                    "\n\nIMPORTANT — NovaTech Colombia (PostgreSQL). "
+                    "Usa ÚNICAMENTE estas vistas: v_perfil_empleado, v_nomina_mensual, "
+                    "v_asistencia_mensual, v_rotacion_retiros, v_headcount_historico, "
+                    "v_evaluaciones_desempeno, v_vacantes_reclutamiento, "
+                    "v_engagement_encuestas, v_capacitaciones. "
+                    "Tablas de apoyo: niveles_cargo, salarios, incapacidades, "
+                    "financials_empresa, saldo_vacaciones. Sintaxis PostgreSQL."
+                )
+                resp = self._client.models.generate_content(
+                    model=self.model_name, contents=text,
+                    config=_genai.types.GenerateContentConfig(
+                        thinking_config=_genai.types.ThinkingConfig(thinking_budget=0)))
+                try:
+                    self.last_input_tokens  = resp.usage_metadata.prompt_token_count
+                    self.last_output_tokens = resp.usage_metadata.candidates_token_count
+                except Exception: pass
+                return resp.text
+        return _StaticCopilot(config=cfg)
 
 vn = _make_copilot()
-conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-conn.execute('''
+
+conn = _PGConn(
+    host=os.getenv("HR_DB_HOST", "localhost"),
+    port=int(os.getenv("HR_DB_PORT", "5432")),
+    dbname=os.getenv("HR_DB_NAME", "hrcopilot"),
+    user=os.getenv("HR_DB_USER", "juan"),
+    password=os.getenv("HR_DB_PASSWORD", ""),
+)
+
+# Tablas de métricas y caché (idempotentes)
+conn.execute("""
     CREATE TABLE IF NOT EXISTS usage_metrics (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT,
-        question TEXT,
-        tokens_input INTEGER,
+        id            SERIAL PRIMARY KEY,
+        timestamp     TEXT,
+        question      TEXT,
+        tokens_input  INTEGER,
         tokens_output INTEGER,
-        cost REAL,
-        sql_generated TEXT
+        cost          REAL,
+        sql_generated TEXT,
+        role          TEXT,
+        latency_ms    INTEGER,
+        cache_hit     INTEGER,
+        success       INTEGER
     )
-''')
-# Migraciones aditivas de usage_metrics (idempotentes)
-for _col, _typ in [("sql_generated", "TEXT"), ("role", "TEXT"), ("latency_ms", "INTEGER"),
-                   ("cache_hit", "INTEGER"), ("success", "INTEGER")]:
-    try:
-        conn.execute(f"ALTER TABLE usage_metrics ADD COLUMN {_col} {_typ}")
-    except Exception:
-        pass
-conn.execute('''
+""")
+conn.execute("""
     CREATE TABLE IF NOT EXISTS query_cache (
         question_hash TEXT PRIMARY KEY,
         question      TEXT,
         sql_generated TEXT,
         result_json   TEXT
     )
-''')
-conn.commit()
-vn.run_sql = lambda sql: pd.read_sql_query(sql, conn)
+""")
+
+vn.run_sql = lambda sql: pd.read_sql_query(sql, conn._c)
 vn.run_sql_is_set = True
-print("  Ready.")
+print("  Listo.")
 
 # Catálogo de cargos para el segmentador del dashboard estático.
 try:
-    JOB_ROLES = dict(pd.read_sql_query("SELECT role_id, role_name FROM job_roles ORDER BY role_name", conn).values)
+    JOB_ROLES = dict(pd.read_sql_query(
+        "SELECT cargo_id, nombre FROM cargos ORDER BY nombre", conn._c
+    ).values)
 except Exception:
     JOB_ROLES = {}
 
@@ -325,16 +351,34 @@ def _generate_chart_code(question: str, sql: str, df: pd.DataFrame) -> str:
 
 
 # ── SQL safety net ─────────────────────────────────────────────────────────────
-def clean_sql(sql: str) -> str:
-    """Strips markdown fences and validates parenthesis balance."""
-    sql = re.sub(r"```sql|```", "", sql).strip()
+def clean_sql(raw: str) -> str:
+    """
+    Extrae y limpia el SQL generado por Vanna/Gemini.
+    Maneja: bloques ```sql```, UNION ALL, CTEs, y paréntesis desbalanceados.
+    Vanna a veces devuelve solo el último SELECT de un UNION — esta función
+    recupera el bloque completo desde el primer SELECT/WITH.
+    """
+    # 1. Quitar fences de markdown
+    sql = re.sub(r"```sql", "", raw, flags=re.IGNORECASE)
+    sql = re.sub(r"```", "", sql).strip()
+
+    # 2. Si Vanna truncó un UNION ALL, intentar recuperar el bloque completo
+    #    buscando desde el primer WITH o SELECT en el texto original
+    if sql and not re.match(r"^\s*(WITH|SELECT)", sql, re.IGNORECASE):
+        m = re.search(r"((?:WITH|SELECT)\b.+)", raw, re.IGNORECASE | re.DOTALL)
+        if m:
+            candidate = re.sub(r"```sql|```", "", m.group(1)).strip()
+            if candidate.count("(") == candidate.count(")"):
+                sql = candidate
+
+    # 3. Verificar paréntesis
     if sql.count("(") != sql.count(")"):
         raise ValueError(
-            f"Generated SQL has unbalanced parentheses "
-            f"({sql.count('(')} open, {sql.count(')')} close). "
-            "Try rephrasing your question."
+            f"SQL con paréntesis desbalanceados "
+            f"({sql.count('(')} abiertos, {sql.count(')')} cerrados). "
+            "Intenta reformular la pregunta."
         )
-    return sql
+    return sql.rstrip(";")
 
 
 # ── Chart generation ────────────────────────────────────────────────────────────
@@ -548,18 +592,28 @@ def smart_chart(df: pd.DataFrame, question: str, colorway: list) -> go.Figure:
 # ── KPI helpers ────────────────────────────────────────────────────────────────
 def get_kpis() -> dict:
     queries = {
-        "headcount":    "SELECT COUNT(*) AS n FROM employees",
-        "attrition":    "SELECT ROUND(100.0*SUM(CASE WHEN Attrition='Yes' THEN 1 ELSE 0 END)/COUNT(*),1) AS r FROM employees",
-        "avg_income":   "SELECT ROUND(AVG(MonthlyIncome),0) AS r FROM employees",
-        "overtime_pct": "SELECT ROUND(100.0*SUM(CASE WHEN OverTime='Yes' THEN 1 ELSE 0 END)/COUNT(*),1) AS r FROM employees",
-        "avg_perf":     "SELECT ROUND(AVG(PerformanceRating),2) AS r FROM satisfaction",
-        "avg_sat":      "SELECT ROUND(AVG(JobSatisfaction),2) AS r FROM satisfaction",
+        "headcount":    "SELECT COUNT(*) FROM v_perfil_empleado WHERE estado_empleo = 'activo'",
+        "rotacion_pct": """SELECT ROUND(SUM(total_retiros) * 100.0 /
+                             NULLIF(AVG((headcount_inicio + headcount_fin) / 2.0), 0), 1)
+                           FROM v_headcount_historico
+                           WHERE periodo >= CURRENT_DATE - INTERVAL '12 months'""",
+        "salario_prom": "SELECT ROUND(AVG(salario_actual)) FROM v_perfil_empleado WHERE estado_empleo = 'activo'",
+        "overtime_pct": """SELECT ROUND(SUM(total_horas_extra) * 100.0 /
+                             NULLIF(SUM(dias_trabajados * 8), 0), 1)
+                           FROM v_asistencia_mensual
+                           WHERE periodo >= CURRENT_DATE - INTERVAL '3 months'""",
+        "desempeno":    """SELECT ROUND(AVG(puntaje_total), 2)
+                           FROM v_evaluaciones_desempeno
+                           WHERE periodo = (SELECT MAX(periodo) FROM v_evaluaciones_desempeno)""",
+        "enps":         """SELECT ROUND(AVG(enps), 1)
+                           FROM v_engagement_encuestas
+                           WHERE periodo = (SELECT MAX(periodo) FROM v_engagement_encuestas)""",
     }
     result = {}
     for key, sql in queries.items():
         try:
-            val = pd.read_sql(sql, conn).iloc[0, 0]
-            result[key] = int(val) if key in ("headcount", "avg_income") else float(val)
+            val = pd.read_sql_query(sql, conn._c).iloc[0, 0]
+            result[key] = int(val) if key in ("headcount", "salario_prom") else float(val or 0)
         except Exception as e:
             print(f"KPI error [{key}]: {e}")
             result[key] = 0
@@ -572,9 +626,9 @@ def _question_hash(question: str) -> str:
 
 def cache_lookup(question: str):
     try:
-        row = pd.read_sql(
-            "SELECT sql_generated, result_json FROM query_cache WHERE question_hash=?",
-            conn, params=(_question_hash(question),)
+        row = pd.read_sql_query(
+            "SELECT sql_generated, result_json FROM query_cache WHERE question_hash = %s",
+            conn._c, params=(_question_hash(question),)
         )
         if len(row):
             return row.iloc[0]["sql_generated"], row.iloc[0]["result_json"]
@@ -585,11 +639,11 @@ def cache_lookup(question: str):
 def cache_store(question: str, sql: str, result_json: str):
     try:
         conn.execute(
-            "INSERT OR REPLACE INTO query_cache"
-            "(question_hash, question, sql_generated, result_json) VALUES(?,?,?,?)",
+            "INSERT INTO query_cache (question_hash, question, sql_generated, result_json) "
+            "VALUES (%s, %s, %s, %s) ON CONFLICT (question_hash) DO UPDATE "
+            "SET sql_generated = EXCLUDED.sql_generated, result_json = EXCLUDED.result_json",
             (_question_hash(question), question, sql, result_json),
         )
-        conn.commit()
     except Exception:
         pass
 
@@ -600,11 +654,11 @@ def _log_usage(question, role, tokens_in, tokens_out, cost, sql, cache_hit, succ
     try:
         conn.execute(
             "INSERT INTO usage_metrics (timestamp, question, tokens_input, tokens_output, "
-            "cost, sql_generated, role, latency_ms, cache_hit, success) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "cost, sql_generated, role, latency_ms, cache_hit, success) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question, tokens_in, tokens_out,
              cost, sql, role, int((time.time() - t0) * 1000), int(cache_hit), int(success)),
         )
-        conn.commit()
     except Exception:
         pass
 
@@ -650,7 +704,7 @@ def process_question(question: str, role: str | None) -> dict:
 
     # 3. Ejecutar
     try:
-        df = pd.read_sql_query(sql_run, conn)
+        df = pd.read_sql_query(sql_run, conn._c)
         if not cached_sql:
             cache_store(question, sql, "")
     except Exception as e:
@@ -696,12 +750,12 @@ C = {
 FONT = "'Montserrat', sans-serif"
 
 SUGGESTED = [
-    "¿Cuál es la tasa de rotación general?",
-    "¿Qué departamentos tienen la mayor rotación?",
-    "¿Existe una brecha salarial de género?",
-    "Salario promedio por nivel de cargo",
-    "¿Cómo afectan las horas extra a la rotación?",
-    "Distribución de empleados por departamento",
+    "¿Cuál es la tasa de rotación en el último año?",
+    "¿Qué departamentos tienen mayor ausentismo?",
+    "¿Existe brecha salarial entre hombres y mujeres?",
+    "Costo total de nómina por sede este mes",
+    "¿Cuál es el eNPS de NovaTech este trimestre?",
+    "Top 10 cargos con mayor tiempo de cobertura de vacante",
 ]
 
 
@@ -1161,8 +1215,8 @@ def _kpi_filters_bar(role, slug):
         dept_opts = [{"label": DEPT_NAMES[locked], "value": str(locked)}]
         dept_val = str(locked)
 
-    cycles   = [r[0] for r in conn.execute("SELECT cycle FROM survey_cycles ORDER BY cycle DESC")]
-    progcats = [r[0] for r in conn.execute("SELECT DISTINCT category FROM training_programs ORDER BY 1")]
+    cycles   = [r[0] for r in conn.execute("SELECT DISTINCT periodo FROM ciclos_encuesta ORDER BY periodo DESC")]
+    progcats = [r[0] for r in conn.execute("SELECT DISTINCT categoria::text FROM programas_capacitacion ORDER BY 1")]
 
     lbl = {"fontSize": "10px", "fontWeight": "800", "color": C["gray_dark"],
            "letterSpacing": "0.06em", "marginBottom": "8px"}
@@ -1587,7 +1641,7 @@ def update_metrics(days, role):
     if current_session()[1] != "hr_admin":
         raise PreventUpdate
     try:
-        df = pd.read_sql_query("SELECT * FROM usage_metrics", conn)
+        df = pd.read_sql_query("SELECT * FROM usage_metrics", conn._c)
     except Exception:
         df = pd.DataFrame()
     if len(df):

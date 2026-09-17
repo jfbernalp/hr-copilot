@@ -1,11 +1,11 @@
 """
 auth.py
 -------
-Autenticación local para HR Copilot (laboratorio).
+Autenticación local para HR Copilot.
+Compatible con psycopg2 (PostgreSQL). Usa %s como placeholder.
 
-- Hash de contraseñas con hashlib.pbkdf2_hmac (stdlib — sin dependencias nuevas).
-- Rate-limit en memoria: 5 intentos fallidos → bloqueo de 5 minutos por usuario.
-- La tabla `users` la crea/puebla setup/seed_users.py.
+- Hash de contraseñas con hashlib.pbkdf2_hmac (stdlib).
+- Rate-limit en memoria: 5 intentos fallidos → bloqueo 5 minutos.
 """
 
 import os
@@ -17,7 +17,6 @@ _ITERATIONS  = 60_000
 MAX_ATTEMPTS = 5
 LOCK_SECONDS = 300
 
-# username → (intentos_fallidos, bloqueado_hasta_ts)
 _attempts: dict = {}
 
 
@@ -33,10 +32,9 @@ def verify_password(password: str, password_hash: str, salt: str) -> bool:
 
 
 def check_login(conn, username: str, password: str):
-    """Valida credenciales contra la tabla users.
+    """Valida credenciales contra la tabla users (PostgreSQL).
 
     Devuelve (ok, user_dict | None, mensaje_error | None).
-    user_dict: {username, role, full_name}.
     """
     username = (username or "").strip().lower()
     if not username or not password:
@@ -49,7 +47,7 @@ def check_login(conn, username: str, password: str):
         return False, None, f"Cuenta bloqueada por intentos fallidos. Intenta de nuevo en {mins} min."
 
     row = conn.execute(
-        "SELECT password_hash, salt, role, full_name, active FROM users WHERE username = ?",
+        "SELECT password_hash, salt, role, full_name, active FROM users WHERE username = %s",
         (username,),
     ).fetchone()
 

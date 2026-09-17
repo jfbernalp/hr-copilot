@@ -78,111 +78,343 @@ def _norm_filters(filters) -> dict:
 
 
 def build_context(conn, role_cfg: dict, filters=None) -> dict:
-    f = _norm_filters(filters)
-    dept = role_cfg.get("dept_filter")
-    if dept is None and f["dept"] is not None:   # el RLS manda sobre el segmentador
-        dept = int(f["dept"])
-    where = f"WHERE e.department_id = {int(dept)}" if dept is not None else ""
-    emp = pd.read_sql_query(f"""
-        SELECT e.*, d.department_name, jr.role_name,
-               s.JobSatisfaction, s.EnvironmentSatisfaction, s.RelationshipSatisfaction,
-               s.WorkLifeBalance, s.JobInvolvement, s.PerformanceRating
-        FROM employees e
-        LEFT JOIN departments  d  ON e.department_id = d.department_id
-        LEFT JOIN job_roles    jr ON e.role_id = jr.role_id
-        LEFT JOIN satisfaction s  ON e.employee_id = s.employee_id
-        {where}
-    """, conn)
+    """
+    Construye el contexto de datos desde el esquema PostgreSQL de NovaTech Colombia.
+    Produce DataFrames con nombres de columna compatibles con las funciones de KPI.
+    """
+    f    = _norm_filters(filters)
+    _c   = getattr(conn, "_c", conn)   # desenvuelve _PGConn si aplica
+    sede = role_cfg.get("sede_filter")
+    sw   = f"AND sede = '{sede}'" if sede else ""
+
+    def _q(sql, fallback_cols=None):
+        try:
+            return pd.read_sql_query(sql, _c)
+        except Exception:
+            if fallback_cols:
+                return pd.DataFrame(columns=fallback_cols)
+            return pd.DataFrame()
+
+    def _ids_clause(ids):
+        return f"({','.join(str(i) for i in ids)})" if ids else "(NULL)"
+
+    # ── Ventana temporal ──────────────────────────────────────────────────────
+    all_months = _q(
+        "SELECT DISTINCT TO_CHAR(periodo,'YYYY-MM') AS m "
+        "FROM v_asistencia_mensual ORDER BY m"
+    ).get("m", pd.Series()).tolist() or ["2026-08"]
+    n = int(f["period"]) if f["period"] else len(all_months)
+    months = all_months[-n:]
+    mset   = set(months)
+    m_arr  = ",".join(f"'{m}'" for m in months) if months else "''"
+
+    # ── emp: perfil de empleados con aliases de columnas del esquema anterior ─
+    gender_filter = ""
     if f["gender"]:
-        emp = emp[emp["Gender"] == f["gender"]]
-    if f["level"]:
-        emp = emp[emp["JobLevel"] == int(f["level"])]
+        g = "F" if f["gender"] == "Female" else "M"
+        gender_filter = f"AND genero = '{g}'"
+    level_filter = f"AND nivel_orden = {int(f['level'])}" if f["level"] else ""
+
+    emp = _q(f"""
+        SELECT
+            pe.empleado_id                                                  AS employee_id,
+            CASE WHEN pe.genero='F' THEN 'Female' ELSE 'Male' END          AS Gender,
+            CASE WHEN pe.estado_empleo='activo' THEN 'No' ELSE 'Yes' END   AS Attrition,
+            pe.edad::int                                                    AS Age,
+            pe.salario_actual                                               AS MonthlyIncome,
+            pe.nivel_orden::int                                             AS JobLevel,
+            ROUND(pe.anos_empresa)::int                                     AS YearsAtCompany,
+            pe.departamento                                                 AS department_name,
+            pe.cargo                                                        AS role_name,
+            pe.sede,
+            -- Columnas de satisfacción: derivadas de última encuesta (escala 1-4)
+            COALESCE(ROUND(re.satisfaccion_cargo  * 3.0/10 + 1)::int, 3)  AS JobSatisfaction,
+            COALESCE(ROUND(re.orgullo_empresa     * 3.0/10 + 1)::int, 3)  AS EnvironmentSatisfaction,
+            COALESCE(ROUND(re.relacion_jefe       * 3.0/10 + 1)::int, 3)  AS RelationshipSatisfaction,
+            COALESCE(ROUND(re.equilibrio_vida     * 3.0/10 + 1)::int, 3)  AS WorkLifeBalance,
+            COALESCE(ROUND(re.oportunidades_desarrollo*3.0/10+1)::int, 3)  AS JobInvolvement,
+            COALESCE(ROUND(ev.puntaje_total)::int, 3)                      AS PerformanceRating,
+            -- OverTime derivado de asistencia (último mes disponible)
+            CASE WHEN ot.total_horas_extra > 0 THEN 'Yes' ELSE 'No' END   AS OverTime
+        FROM v_perfil_empleado pe
+        LEFT JOIN LATERAL (
+            SELECT satisfaccion_cargo, orgullo_empresa, relacion_jefe,
+                   equilibrio_vida, oportunidades_desarrollo
+            FROM respuestas_encuesta rr
+            JOIN ciclos_encuesta cc ON cc.ciclo_id = rr.ciclo_id
+            WHERE rr.empleado_id = pe.empleado_id
+            ORDER BY cc.fecha_inicio DESC LIMIT 1
+        ) re ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT puntaje_total FROM v_evaluaciones_desempeno
+            WHERE empleado_id = pe.empleado_id
+            ORDER BY periodo DESC LIMIT 1
+        ) ev ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT total_horas_extra FROM v_asistencia_mensual
+            WHERE empleado_id = pe.empleado_id
+            ORDER BY periodo DESC LIMIT 1
+        ) ot ON TRUE
+        WHERE 1=1 {sw} {gender_filter} {level_filter}
+    """)
+    # PostgreSQL devuelve alias en minúsculas — restauramos CamelCase esperado por KPI functions
+    emp = emp.rename(columns={
+        "gender": "Gender", "attrition": "Attrition", "age": "Age",
+        "monthlyincome": "MonthlyIncome", "joblevel": "JobLevel",
+        "yearsatcompany": "YearsAtCompany",
+        "jobsatisfaction": "JobSatisfaction",
+        "environmentsatisfaction": "EnvironmentSatisfaction",
+        "relationshipsatisfaction": "RelationshipSatisfaction",
+        "worklifebalance": "WorkLifeBalance",
+        "jobinvolvement": "JobInvolvement",
+        "performancerating": "PerformanceRating",
+        "overtime": "OverTime",
+    })
+    if emp.empty:
+        emp = pd.DataFrame(columns=["employee_id","Gender","Attrition","Age","MonthlyIncome",
+            "JobLevel","YearsAtCompany","department_name","role_name","sede",
+            "JobSatisfaction","EnvironmentSatisfaction","RelationshipSatisfaction",
+            "WorkLifeBalance","JobInvolvement","PerformanceRating","OverTime"])
+
     if f["cargo"]:
-        emp = emp[emp["role_id"] == int(f["cargo"])]
-    ids = set(emp["employee_id"])
+        cargo_ids = _q(
+            f"SELECT empleado_id FROM v_perfil_empleado WHERE cargo_actual_id = {int(f['cargo'])}"
+        ).get("empleado_id", pd.Series()).tolist()
+        emp = emp[emp["employee_id"].isin(cargo_ids)]
+
+    ids     = set(emp["employee_id"].tolist())
     dept_of = emp.set_index("employee_id")["department_name"]
 
-    def t(name):
-        return pd.read_sql_query(f"SELECT * FROM {name}", conn)
+    # ── att: asistencia mensual ───────────────────────────────────────────────
+    att = _q(f"""
+        SELECT empleado_id AS employee_id,
+               TO_CHAR(periodo,'YYYY-MM')        AS month,
+               dias_habiles                      AS scheduled_days,
+               (dias_ausencia+dias_incapacidad)  AS absence_days,
+               (dias_trabajados*8)::int          AS regular_hours,
+               COALESCE(total_horas_extra,0)     AS overtime_hours,
+               tardanzas                         AS late_arrivals
+        FROM v_asistencia_mensual
+        WHERE empleado_id IN {_ids_clause(ids)}
+          AND TO_CHAR(periodo,'YYYY-MM') IN ({m_arr})
+          {sw}
+    """)
+    att["dept"] = att["employee_id"].map(dept_of)
 
-    def by_emp(df):
-        df = df[df["employee_id"].isin(ids)].copy()
-        df["dept"] = df["employee_id"].map(dept_of)
-        return df
+    # ── pay: nómina mensual ───────────────────────────────────────────────────
+    pay = _q(f"""
+        SELECT empleado_id AS employee_id,
+               TO_CHAR(periodo,'YYYY-MM')                                          AS month,
+               salario_basico                                                      AS base_salary,
+               auxilio_transporte + bonificaciones + comisiones                    AS benefits,
+               costo_total_empresa - salario_basico - auxilio_transporte
+                 - valor_horas_extra - bonificaciones - comisiones                 AS employer_contributions,
+               valor_horas_extra                                                   AS overtime_pay,
+               costo_total_empresa                                                 AS total_cost
+        FROM v_nomina_mensual
+        WHERE empleado_id IN {_ids_clause(ids)}
+          AND TO_CHAR(periodo,'YYYY-MM') IN ({m_arr})
+          {sw}
+    """, ["employee_id","month","base_salary","benefits","employer_contributions","overtime_pay","total_cost"])
+    pay["dept"] = pay["employee_id"].map(dept_of)
 
-    dates  = by_emp(t("employment_dates"))
-    att    = by_emp(t("attendance_monthly"))
-    pay    = by_emp(t("payroll_monthly"))
-    leaves = by_emp(t("medical_leaves"))
-    resp   = by_emp(t("survey_responses"))
-    parts  = by_emp(t("training_participants"))
-    vacat  = by_emp(t("vacation_balances"))
-
-    # Ventana temporal del segmentador "período"
-    months_all = sorted(att["month"].unique()) or ["2026-05"]
-    months = months_all[-int(f["period"]):] if f["period"] else months_all
-    att = att[att["month"].isin(months)]
-    pay = pay[pay["month"].isin(months)]
-    leaves = leaves[leaves["start_date"].str[:7].isin(months)]
+    # ── leaves: incapacidades ─────────────────────────────────────────────────
+    leaves = _q(f"""
+        SELECT i.empleado_id AS employee_id,
+               i.fecha_inicio::text AS start_date,
+               i.dias               AS days,
+               CASE i.tipo
+                   WHEN 'ARL_accidente'  THEN 'Accidente'
+                   WHEN 'ARL_enfermedad' THEN 'Enfermedad Laboral'
+                   ELSE 'EPS'
+               END                  AS leave_type
+        FROM incapacidades i
+        JOIN v_perfil_empleado pe ON pe.empleado_id = i.empleado_id
+        WHERE i.empleado_id IN {_ids_clause(ids)}
+          {'AND pe.sede = ' + chr(39) + sede + chr(39) if sede else ''}
+    """)
+    leaves["dept"] = leaves["employee_id"].map(dept_of)
+    leaves = leaves[leaves["start_date"].str[:7].isin(mset)]
     if f["leave"]:
         leaves = leaves[leaves["leave_type"].str.contains(LEAVE_FILTER[f["leave"]])]
 
-    # Headcount histórico derivado de employment_dates → respeta TODOS los filtros
-    hire, exit_ = pd.to_datetime(dates["hire_date"]), pd.to_datetime(dates["exit_date"])
-    hm = hire.dt.to_period("M").astype(str)
-    em = exit_.dt.to_period("M").astype(str)
-    hist_rows = []
-    for m in months:
-        end = pd.Timestamp(m + "-01") + pd.offsets.MonthEnd(0)
-        out = dates[em == m]
-        hist_rows.append({
-            "month": m,
-            "headcount": int(((hire <= end) & (exit_.isna() | (exit_ > end))).sum()),
-            "hires": int((hm == m).sum()),
-            "exits_voluntary":   int((out["exit_type"] == "voluntary").sum()),
-            "exits_involuntary": int((out["exit_type"] == "involuntary").sum()),
-        })
-    hist = pd.DataFrame(hist_rows)
+    # ── dates: historial de empleo ────────────────────────────────────────────
+    dates = _q(f"""
+        SELECT empleado_id AS employee_id,
+               fecha_ingreso::text AS hire_date,
+               fecha_retiro::text  AS exit_date,
+               CASE WHEN estado_empleo='retirado' THEN 'voluntary' ELSE NULL END AS exit_type
+        FROM v_perfil_empleado
+        WHERE empleado_id IN {_ids_clause(ids)}
+    """)
+    dates["dept"] = dates["employee_id"].map(dept_of)
 
-    vac = t("vacancies")
-    if dept is not None:
-        vac = vac[vac["department_id"] == int(dept)]
-    if f["level"]:
-        vac = vac[vac["job_level"] == int(f["level"])]
-    if f["cargo"]:
-        vac = vac[vac["role_id"] == int(f["cargo"])]
-    if f["period"]:
-        vac = vac[vac["opened_date"] >= months[0] + "-01"]
-    dept_names = dict(pd.read_sql_query("SELECT * FROM departments", conn).values)
-    vac["dept"] = vac["department_id"].map(dept_names)
+    # ── hist: headcount histórico de v_headcount_historico ────────────────────
+    hist = _q(f"""
+        SELECT TO_CHAR(periodo,'YYYY-MM')  AS month,
+               SUM(headcount_fin)          AS headcount,
+               SUM(ingresos)               AS hires,
+               SUM(retiros_voluntarios)    AS exits_voluntary,
+               SUM(retiros_involuntarios)  AS exits_involuntary
+        FROM v_headcount_historico
+        WHERE TO_CHAR(periodo,'YYYY-MM') IN ({m_arr})
+          {sw}
+        GROUP BY TO_CHAR(periodo,'YYYY-MM'), periodo
+        ORDER BY periodo
+    """)
+    if hist.empty:
+        hist = pd.DataFrame(columns=["month","headcount","hires","exits_voluntary","exits_involuntary"])
 
-    # Participación de encuestas: invitados recalculados bajo los filtros activos
-    cycles = t("survey_cycles")
-    cycles["invited"] = [
-        int(((hire <= d) & (exit_.isna() | (exit_ >= d))).sum())
-        for d in pd.to_datetime(cycles["survey_date"])
-    ]
+    # ── survey responses ──────────────────────────────────────────────────────
+    resp = _q(f"""
+        SELECT re.empleado_id AS employee_id,
+               ce.periodo     AS cycle,
+               re.orgullo_empresa                                          AS q_pride,
+               re.recomendaria                                             AS q_recommend_nps,
+               re.equilibrio_vida                                          AS q_effort,
+               re.intencion_permanencia                                    AS q_stay,
+               re.satisfaccion_cargo                                       AS q_satisfaction
+        FROM respuestas_encuesta re
+        JOIN ciclos_encuesta ce ON ce.ciclo_id = re.ciclo_id
+        WHERE re.empleado_id IN {_ids_clause(ids)}
+    """)
+    resp["dept"] = resp["employee_id"].map(dept_of)
+    # Escalar preguntas de engagement 0-10 → 1-5 (q_recommend_nps se deja en 0-10 para eNPS)
+    for col in ["q_pride", "q_effort", "q_stay", "q_satisfaction"]:
+        if col in resp.columns:
+            resp[col] = (resp[col] * 4.0 / 10.0 + 1).round().clip(1, 5).astype("Int64")
+
     sel_cycle = f["cycle"] or (resp["cycle"].max() if len(resp) else None)
 
-    progs = t("training_programs")
+    # ── survey cycles ─────────────────────────────────────────────────────────
+    cycles = _q("""
+        SELECT periodo AS cycle, total_invitados AS invited,
+               fecha_inicio::text AS survey_date
+        FROM ciclos_encuesta ORDER BY periodo
+    """)
+    if len(cycles) and len(dates):
+        hire  = pd.to_datetime(dates["hire_date"])
+        exit_ = pd.to_datetime(dates["exit_date"])
+        def _count(d):
+            try:
+                ts = pd.Timestamp(d)
+                return int(((hire <= ts) & (exit_.isna() | (exit_ >= ts))).sum())
+            except Exception:
+                return 0
+        cycles["invited"] = cycles["survey_date"].apply(_count)
+
+    # ── vacantes ──────────────────────────────────────────────────────────────
+    vac = _q(f"""
+        SELECT vacante_id,
+               fecha_apertura::text  AS opened_date,
+               fecha_cierre::text    AS closed_date,
+               estado                AS status,
+               CASE fuente_contratacion
+                   WHEN 'interno' THEN 'internal' ELSE 'external'
+               END                   AS filled_by,
+               dias_abierta          AS days_to_fill,
+               nivel_cargo,
+               departamento,
+               sede,
+               salario_ofrecido      AS monthly_salary,
+               ofertas_extendidas    AS offers_extended,
+               1                     AS offers_accepted,
+               NULL::float           AS quality_of_hire,
+               0                     AS department_id,
+               0                     AS job_level
+        FROM v_vacantes_reclutamiento
+        WHERE 1=1 {sw}
+    """)
+    vac["dept"] = vac["departamento"]
+    if f["period"] and months:
+        vac = vac[vac["opened_date"].fillna("") >= months[0] + "-01"]
+
+    # ── capacitaciones ────────────────────────────────────────────────────────
+    progs = _q("""
+        SELECT DISTINCT ON (nombre)
+               programa_id AS program_id,
+               nombre      AS program_name,
+               categoria::text AS category,
+               costo_unitario AS cost_per_participant
+        FROM programas_capacitacion ORDER BY nombre, fecha_inicio
+    """)
     if f["progcat"]:
         progs = progs[progs["category"] == f["progcat"]]
+
+    parts = _q(f"""
+        SELECT empleado_id AS employee_id,
+               programa_id AS program_id,
+               estado::text AS status,
+               puntaje_desempeno_pre  AS perf_score_pre,
+               puntaje_desempeno_post AS perf_score_post,
+               calificacion           AS score
+        FROM v_capacitaciones
+        WHERE empleado_id IN {_ids_clause(ids)}
+          {sw}
+    """)
+    parts["dept"] = parts["employee_id"].map(dept_of)
+    if f["progcat"] and len(progs):
         parts = parts[parts["program_id"].isin(progs["program_id"])]
 
-    runs = t("payroll_runs")
-    fin  = t("company_financials")
-    pay_company = pd.read_sql_query(
-        "SELECT month, SUM(total_cost) AS total_cost, SUM(overtime_pay) AS overtime_pay, "
-        "SUM(base_salary) AS base_salary FROM payroll_monthly GROUP BY month", conn)
-    runs, fin = runs[runs["month"].isin(months)], fin[fin["month"].isin(months)]
-    pay_company = pay_company[pay_company["month"].isin(months)]
+    # ── saldo de vacaciones ───────────────────────────────────────────────────
+    vacat = _q(f"""
+        SELECT sv.empleado_id AS employee_id,
+               TO_CHAR(sv.periodo,'YYYY-MM') AS month,
+               sv.dias_causados  AS accrued_days,
+               sv.dias_tomados   AS taken_days,
+               sv.dias_pendientes AS pending_days
+        FROM saldo_vacaciones sv
+        JOIN v_perfil_empleado pe ON pe.empleado_id = sv.empleado_id
+        WHERE sv.empleado_id IN {_ids_clause(ids)}
+          {'AND pe.sede = ' + chr(39) + sede + chr(39) if sede else ''}
+    """)
+    vacat["dept"] = vacat["employee_id"].map(dept_of)
 
+    # ── salary bands ──────────────────────────────────────────────────────────
+    bands = _q("""
+        SELECT nombre AS job_level_name, orden AS level,
+               salario_min_ref AS band_min,
+               salario_max_ref AS band_max,
+               (salario_min_ref+salario_max_ref)/2 AS band_mid
+        FROM niveles_cargo ORDER BY orden
+    """)
+
+    # ── financials ────────────────────────────────────────────────────────────
+    fin = _q(f"""
+        SELECT TO_CHAR(periodo,'YYYY-MM') AS month,
+               ingresos_operacionales     AS operating_revenue,
+               gasto_nomina               AS total_labor_cost
+        FROM financials_empresa
+        WHERE TO_CHAR(periodo,'YYYY-MM') IN ({m_arr})
+        ORDER BY periodo
+    """)
+
+    pay_company = _q(f"""
+        SELECT TO_CHAR(periodo,'YYYY-MM') AS month,
+               SUM(costo_total_empresa)   AS total_cost,
+               SUM(valor_horas_extra)     AS overtime_pay,
+               SUM(salario_basico)        AS base_salary
+        FROM v_nomina_mensual
+        WHERE TO_CHAR(periodo,'YYYY-MM') IN ({m_arr})
+          {sw}
+        GROUP BY TO_CHAR(periodo,'YYYY-MM') ORDER BY 1
+    """)
+
+    # ── payroll runs (stub — todos on-time) ───────────────────────────────────
+    runs = _q(f"""
+        SELECT DISTINCT TO_CHAR(periodo,'YYYY-MM') AS month,
+               1 AS on_time, 0 AS payslips_with_errors
+        FROM v_nomina_mensual
+        WHERE TO_CHAR(periodo,'YYYY-MM') IN ({m_arr})
+    """)
+
+    last_month = months[-1] if months else "2026-08"
     return {
         "emp": emp, "dates": dates, "att": att, "pay": pay, "leaves": leaves,
         "hist": hist, "vac": vac, "cycles": cycles, "resp": resp, "sel_cycle": sel_cycle,
         "progs": progs, "parts": parts, "vacat": vacat,
-        "runs": runs, "bands": t("salary_bands"), "fin": fin, "pay_company": pay_company,
-        "months": months, "last_month": months[-1],
+        "runs": runs, "bands": bands, "fin": fin, "pay_company": pay_company,
+        "months": months, "last_month": last_month,
     }
 
 

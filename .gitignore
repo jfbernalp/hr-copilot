@@ -23,5 +23,12 @@ chroma_db/
 chroma.sqlite3
 *.db-journal
 
+# Bases de datos SQLite locales (la BD de producción es PostgreSQL)
+data/hr_analytics.db
+*.db
+
+# Rhistory
+.Rhistory
+
 # Ignorar archivos PDF pesados y manuales
 *.pdf
