@@ -1,17 +1,23 @@
 """
 kpi_catalog.py
 --------------
-Motor del dashboard estático de KPIs (utilidad 2).
+Motor del dashboard estático de KPIs (utilidad 2) — NovaTech Colombia S.A.S.
 
 Carga el catálogo de 44 KPIs (data/kpi_catalog.csv) y registra, por índice de
 catálogo, una función de cálculo que produce valor + semáforo + figura Plotly
 usando el tipo de gráfico que recomienda el propio catálogo. Los datos vienen
-de las 4 tablas núcleo IBM + las 14 tablas sintéticas (build_synthetic_data.py).
+de las 9 vistas semánticas de NovaTech/PostgreSQL (v_perfil_empleado,
+v_nomina_mensual, v_asistencia_mensual, v_headcount_historico,
+v_evaluaciones_desempeno, v_vacantes_reclutamiento, v_capacitaciones,
+v_engagement_encuestas) y de las tablas de apoyo (incapacidades,
+saldo_vacaciones, niveles_cargo, financials_empresa) — ver setup/schema_postgres.sql.
+(Nota histórica: el catálogo nació sobre la Gen 1 SQLite/IBM HR, archivada en
+legacy/gen1_sqlite/; el CSV de definiciones se conservó, las queries no.)
 
-RLS: build_all() recibe la config del rol (dept_filter, can_see_salary).
-El filtro de departamento se aplica al contexto de datos; los KPIs salariales
-se marcan locked=True para roles sin permiso y el dashboard los renderiza
-bloqueados sin calcular nada.
+RLS: build_all() recibe la config del rol (sede_filter, can_see_salary) desde
+app/rls.py. El filtro de sede (Medellín/Bogotá) se aplica al contexto de datos;
+los KPIs salariales se marcan locked=True para roles sin permiso y el
+dashboard los renderiza bloqueados sin calcular nada.
 """
 
 import os

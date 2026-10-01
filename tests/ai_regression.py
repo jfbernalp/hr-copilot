@@ -1,8 +1,9 @@
 """
 ai_regression.py
 ----------------
-Test de regresión del pipeline IA (Fase 2): corre preguntas canónicas por el
-pipeline completo (generate_sql → RLS → SQLite → generate_chart) y valida:
+Test de regresión del pipeline IA — NovaTech Colombia S.A.S. / PostgreSQL.
+Corre preguntas canónicas por el pipeline completo (generate_sql → RLS →
+PostgreSQL (vistas semánticas) → generate_chart) y valida:
 
   1. El SQL generado ejecuta y devuelve filas.
   2. El tipo de gráfico pertenece a la familia esperada para la semántica de la
