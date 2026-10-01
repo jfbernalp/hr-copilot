@@ -19,6 +19,7 @@ import time
 import hashlib
 import psycopg2
 import psycopg2.extras
+import google.genai as genai
 from datetime import datetime
 import pandas as pd
 import numpy as np
