@@ -18,11 +18,13 @@ Requiere USE_CHROMA=1 en .env para activar ChromaDB en el dashboard.
 """
 
 import os, sys
-import google.genai as genai
 import pandas as pd
 from dotenv import load_dotenv
 from vanna.legacy.chromadb.chromadb_vector import ChromaDB_VectorStore
 from vanna.legacy.base.base import VannaBase
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from llm_provider import GeminiProvider, get_model_name
 
 load_dotenv()
 
@@ -35,8 +37,8 @@ class HRCopilot(ChromaDB_VectorStore, VannaBase):
     def __init__(self, config=None):
         ChromaDB_VectorStore.__init__(self, config=config)
         VannaBase.__init__(self, config=config)
-        self._client    = genai.Client(api_key=config.get("api_key"))
-        self.model_name = config.get("model", "gemini-3.6-flash")
+        self._provider  = GeminiProvider(api_key=config.get("api_key"), model_name=config.get("model"))
+        self.model_name = self._provider.model_name
         self.last_input_tokens = self.last_output_tokens = self.last_total_tokens = 0
 
     def system_message(self, message):    return message
@@ -76,20 +78,11 @@ class HRCopilot(ChromaDB_VectorStore, VannaBase):
             "Usa sintaxis PostgreSQL. No uses comillas dobles para strings. "
             "Nunca inventes nombres de columnas o tablas."
         )
-        response = self._client.models.generate_content(
-            model=self.model_name,
-            contents=text,
-            config=genai.types.GenerateContentConfig(
-                thinking_config=genai.types.ThinkingConfig(thinking_budget=0)
-            )
-        )
-        try:
-            self.last_input_tokens  = response.usage_metadata.prompt_token_count
-            self.last_output_tokens = response.usage_metadata.candidates_token_count
-            self.last_total_tokens  = response.usage_metadata.total_token_count
-        except Exception:
-            pass
-        return response.text
+        resp_text, tokens_in, tokens_out = self._provider.generate(text)
+        self.last_input_tokens  = tokens_in
+        self.last_output_tokens = tokens_out
+        self.last_total_tokens  = tokens_in + tokens_out
+        return resp_text
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1364,9 +1357,10 @@ def entrenar():
     print(f"  CHROMA_DIR: {CHROMA_DIR}")
     vn = HRCopilot(config={
         "api_key":                  api_key,
-        "model":                    "gemini-3.6-flash",
+        "model":                    get_model_name(),
         "chroma_persist_directory": CHROMA_DIR,
     })
+    print(f"  Modelo: {get_model_name()}")
 
     # Limpiar entrenamiento previo
     print("Limpiando ChromaDB anterior…")

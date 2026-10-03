@@ -19,7 +19,6 @@ import time
 import hashlib
 import psycopg2
 import psycopg2.extras
-import google.genai as genai
 from datetime import datetime
 import pandas as pd
 import numpy as np
@@ -62,6 +61,8 @@ COST_OUTPUT_PER_1M = 0.30
 # La clase HRCopilot con ChromaDB vive en train_vanna_postgres.py.
 # Aquí la importamos para que el dashboard use el RAG entrenado.
 from setup.train_vanna_postgres import HRCopilot
+# Único punto de configuración del modelo LLM (env var LLM_MODEL, ver llm_provider.py).
+from setup.llm_provider import GeminiProvider, get_model_name
 
 # ── Conexión PostgreSQL ────────────────────────────────────────────────────────
 # Wrapper compatible con el patrón conn.execute() que usa el resto del código.
@@ -97,8 +98,9 @@ print("Inicializando HR Copilot — NovaTech Colombia…")
 def _make_copilot():
     """Usa ChromaDB por defecto (Hetzner tiene RAM suficiente).
     Fallback a modo estático si ChromaDB no está disponible."""
-    cfg = {"api_key": API_KEY, "model": "gemini-3.6-flash",
+    cfg = {"api_key": API_KEY, "model": get_model_name(),
            "chroma_persist_directory": CHROMA_DIR}
+    print(f"  Modelo LLM: {cfg['model']} (configurable con LLM_MODEL en .env)")
     try:
         v = HRCopilot(config=cfg)
         n = len(v.get_training_data())
@@ -109,14 +111,13 @@ def _make_copilot():
     except Exception as exc:
         print(f"  RAG: ChromaDB no disponible ({exc}); usando modo estático")
         from vanna.legacy.base.base import VannaBase
-        import google.genai as genai
         from setup.train_vanna_postgres import DDL_VISTAS, DOCUMENTACION, EJEMPLOS
 
         class _StaticCopilot(VannaBase):
             def __init__(self, config=None):
                 VannaBase.__init__(self, config=config)
-                self._client    = genai.Client(api_key=config.get("api_key"))
-                self.model_name = config.get("model", "gemini-3.6-flash")
+                self._provider  = GeminiProvider(api_key=config.get("api_key"), model_name=config.get("model"))
+                self.model_name = self._provider.model_name
                 self.last_input_tokens = self.last_output_tokens = self.last_total_tokens = 0
             def system_message(self, m): return m
             def user_message(self, m):   return m
@@ -131,7 +132,6 @@ def _make_copilot():
             def remove_training_data(self, *a, **kw): pass
             def get_training_data(self, **kw): return pd.DataFrame()
             def submit_prompt(self, prompt, **kwargs):
-                import google.genai as _genai
                 text = ("\n".join([p if isinstance(p, str) else str(p) for p in prompt])
                         if isinstance(prompt, list) else str(prompt))
                 text += (
@@ -143,15 +143,10 @@ def _make_copilot():
                     "Tablas de apoyo: niveles_cargo, salarios, incapacidades, "
                     "financials_empresa, saldo_vacaciones. Sintaxis PostgreSQL."
                 )
-                resp = self._client.models.generate_content(
-                    model=self.model_name, contents=text,
-                    config=_genai.types.GenerateContentConfig(
-                        thinking_config=_genai.types.ThinkingConfig(thinking_budget=0)))
-                try:
-                    self.last_input_tokens  = resp.usage_metadata.prompt_token_count
-                    self.last_output_tokens = resp.usage_metadata.candidates_token_count
-                except Exception: pass
-                return resp.text
+                resp_text, tokens_in, tokens_out = self._provider.generate(text)
+                self.last_input_tokens  = tokens_in
+                self.last_output_tokens = tokens_out
+                return resp_text
         return _StaticCopilot(config=cfg)
 
 vn = _make_copilot()
@@ -336,19 +331,10 @@ def _generate_chart_code(question: str, sql: str, df: pd.DataFrame) -> str:
         f"  categorical cardinality: {df_cardinality}\n\n"
         "Generate the Plotly chart following ALL mandatory rules above."
     )
-    response = vn._client.models.generate_content(
-        model=vn.model_name,
-        contents=PLOTLY_PROMPT + "\n\n" + user_msg,
-        config=genai.types.GenerateContentConfig(
-            thinking_config=genai.types.ThinkingConfig(thinking_budget=0)
-        ),
-    )
-    try:
-        _last_chart_usage["in"]  = response.usage_metadata.prompt_token_count
-        _last_chart_usage["out"] = response.usage_metadata.candidates_token_count
-    except Exception:
-        pass
-    return response.text
+    resp_text, tokens_in, tokens_out = vn._provider.generate(PLOTLY_PROMPT + "\n\n" + user_msg)
+    _last_chart_usage["in"]  = tokens_in
+    _last_chart_usage["out"] = tokens_out
+    return resp_text
 
 
 # ── SQL safety net ─────────────────────────────────────────────────────────────
