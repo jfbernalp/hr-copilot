@@ -109,9 +109,9 @@ def main():
 
         ok_type = any(types == a or types <= a for a in case["allowed"])
         if case.get("no_pure_vbar") and types == {"bar"}:
-            # barra vertical pura donde no corresponde: ¿es horizontal?
+            # barra vertical pura donde no corresponde: solo pasa si es horizontal.
             orientations = {tr.get("orientation") for tr in fig["data"]}
-            ok_type = orientations == {"h"} and not case.get("no_pure_vbar")
+            ok_type = orientations == {"h"}
         chart_total += 1
         chart_pass += ok_type
 
