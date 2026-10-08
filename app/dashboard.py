@@ -315,8 +315,13 @@ def _enforce_praxedes_palette(fig: go.Figure) -> go.Figure:
 _last_chart_usage = {"in": 0, "out": 0}
 
 def _generate_chart_code(question: str, sql: str, df: pd.DataFrame) -> str:
-    """Calls Gemini directly with the constrained chart prompt — not Vanna RAG."""
-    df_sample = df.head(5).to_string(index=False)
+    """Calls Gemini directly with the constrained chart prompt — not Vanna RAG.
+
+    SECURITY: never pass real cell values to the LLM, only aggregate metadata
+    (shape, dtypes, cardinality). The DataFrame can contain sensitive columns
+    (e.g. v_perfil_empleado returns nombre_completo + salario_actual in the
+    same row) — a literal sample of rows would leak that data to Gemini.
+    """
     df_cardinality = {
         col: int(df[col].nunique())
         for col in df.select_dtypes(include=["object", "category"]).columns
@@ -327,7 +332,6 @@ def _generate_chart_code(question: str, sql: str, df: pd.DataFrame) -> str:
         f"DataFrame info:\n"
         f"  shape: {df.shape[0]} rows × {df.shape[1]} cols\n"
         f"  dtypes:\n{df.dtypes.to_string()}\n\n"
-        f"  first 5 rows:\n{df_sample}\n\n"
         f"  categorical cardinality: {df_cardinality}\n\n"
         "Generate the Plotly chart following ALL mandatory rules above."
     )
