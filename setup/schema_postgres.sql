@@ -687,7 +687,8 @@ SELECT
         (SUM(CASE WHEN re.recomendaria >= 9 THEN 1 ELSE 0 END)::numeric
          - SUM(CASE WHEN re.recomendaria <= 6 THEN 1 ELSE 0 END)::numeric)
         / NULLIF(COUNT(re.respuesta_id),0) * 100, 1
-    )                                                AS enps
+    )                                                AS enps,
+    ROUND(AVG(re.relacion_jefe),1)                   AS promedio_relacion_jefe
 FROM ciclos_encuesta ce
 JOIN respuestas_encuesta re ON re.ciclo_id    = ce.ciclo_id
 JOIN empleados e            ON e.empleado_id  = re.empleado_id

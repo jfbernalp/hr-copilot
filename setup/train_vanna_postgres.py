@@ -136,7 +136,8 @@ DDL_VISTAS = """
 -- Columnas: periodo (TEXT 'YYYY-QN'), nombre_ciclo, departamento, sede,
 --   respuestas, total_invitados, tasa_participacion (%), promedio_orgullo (0-10),
 --   promedio_enps_raw (0-10), promedio_satisfaccion (0-10), promedio_equilibrio (0-10),
---   promedio_desarrollo (0-10), promedio_retencion (0-10), enps (calculado)
+--   promedio_desarrollo (0-10), promedio_retencion (0-10), enps (calculado),
+--   promedio_relacion_jefe (0-10)
 
 -- v_capacitaciones
 -- Columnas: programa_id, programa, categoria (tecnica/habilidades_blandas/seguridad/
@@ -151,6 +152,7 @@ DDL_VISTAS = """
 -- incapacidades: empleado_id, fecha_inicio, fecha_fin, dias, tipo, diagnostico_cie
 -- financials_empresa: periodo, ingresos_operacionales, gasto_nomina, headcount_total
 -- saldo_vacaciones: empleado_id, periodo, dias_causados, dias_tomados, dias_pendientes
+-- historial_cargos: empleado_id, cargo_id, fecha_inicio, fecha_fin (NULL=cargo vigente)
 """
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -255,7 +257,9 @@ ORDER BY nivel_orden;
         """,
     ),
 
-    # [KPI-28] Distribución Demográfica y Diversidad
+    # [KPI-28] Distribución Demográfica y Diversidad — % sobre el HEADCOUNT TOTAL, como
+    # pide la fórmula del catálogo (antes el % era sobre el total de cada sede, lo que
+    # no es comparable con "% del segmento sobre headcount total").
     (
         "¿Cuál es la distribución demográfica de los empleados por género, sede y nivel educativo?",
         """
@@ -264,7 +268,7 @@ SELECT
     genero,
     nivel_educativo,
     COUNT(*) AS empleados,
-    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (PARTITION BY sede), 1) AS pct_sobre_sede
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 1) AS pct_sobre_headcount_total
 FROM v_perfil_empleado
 WHERE estado_empleo = 'activo'
 GROUP BY sede, genero, nivel_educativo
@@ -432,55 +436,73 @@ ORDER BY periodo, sede;
         """,
     ),
 
-    # [KPI-34] Índice de Riesgo de Fuga (Flight Risk Index)
+    # [KPI-34] Índice de Riesgo de Fuga (Flight Risk Index) — score 0-100 por empleado,
+    # 4 señales normalizadas (min-max sobre la plantilla activa), pesos 30/20/25/25 del
+    # catálogo. Misma fórmula que k_flight_risk en app/kpi_catalog.py — antes este
+    # ejemplo usaba otra fórmula (pesos 40/30/30, sin componente de desempeño).
     (
-        "¿Qué empleados tienen mayor riesgo de fuga según ausentismo, horas extra y antigüedad reciente?",
+        "¿Qué empleados tienen mayor riesgo de fuga según ausentismo, horas extra, antigüedad y desempeño?",
         """
 WITH metricas AS (
     SELECT
-        pe.empleado_id,
-        pe.nombre_completo,
-        pe.departamento,
-        pe.sede,
-        pe.anos_empresa,
-        COALESCE(AVG(am.dias_ausencia::numeric / NULLIF(am.dias_habiles, 0)), 0) AS tasa_aus,
-        COALESCE(AVG(am.total_horas_extra), 0)                                   AS horas_extra_prom
+        pe.empleado_id, pe.nombre_completo, pe.departamento, pe.sede, pe.anos_empresa,
+        COALESCE(AVG(am.dias_ausencia), 0)      AS ausentismo_dias_prom,
+        COALESCE(AVG(am.total_horas_extra), 0)  AS horas_extra_prom,
+        COALESCE(ev.puntaje_total, 3)           AS desempeno
     FROM v_perfil_empleado pe
     LEFT JOIN v_asistencia_mensual am
            ON am.empleado_id = pe.empleado_id
           AND am.periodo >= CURRENT_DATE - INTERVAL '6 months'
+    LEFT JOIN LATERAL (
+        SELECT puntaje_total FROM v_evaluaciones_desempeno
+        WHERE empleado_id = pe.empleado_id ORDER BY periodo DESC LIMIT 1
+    ) ev ON TRUE
     WHERE pe.estado_empleo = 'activo'
-    GROUP BY pe.empleado_id, pe.nombre_completo, pe.departamento, pe.sede, pe.anos_empresa
+    GROUP BY pe.empleado_id, pe.nombre_completo, pe.departamento, pe.sede, pe.anos_empresa, ev.puntaje_total
+),
+normalizado AS (
+    SELECT *,
+        (ausentismo_dias_prom - MIN(ausentismo_dias_prom) OVER()) /
+            NULLIF(MAX(ausentismo_dias_prom) OVER() - MIN(ausentismo_dias_prom) OVER(), 0) AS ausentismo_norm,
+        (horas_extra_prom - MIN(horas_extra_prom) OVER()) /
+            NULLIF(MAX(horas_extra_prom) OVER() - MIN(horas_extra_prom) OVER(), 0)         AS horas_extra_norm,
+        1 - (anos_empresa - MIN(anos_empresa) OVER()) /
+            NULLIF(MAX(anos_empresa) OVER() - MIN(anos_empresa) OVER(), 0)                 AS antiguedad_inv_norm,
+        1 - (desempeno - MIN(desempeno) OVER()) /
+            NULLIF(MAX(desempeno) OVER() - MIN(desempeno) OVER(), 0)                       AS desempeno_inv_norm
+    FROM metricas
 )
 SELECT
-    nombre_completo,
-    departamento,
-    sede,
-    ROUND(anos_empresa, 1)                                          AS años_empresa,
-    ROUND(tasa_aus * 100, 1)                                        AS ausentismo_pct,
-    ROUND(horas_extra_prom, 1)                                      AS horas_extra_prom_mes,
+    nombre_completo, departamento, sede,
+    ROUND(anos_empresa, 1) AS años_empresa,
     ROUND(
-        (LEAST(tasa_aus / 0.05, 1) * 40) +
-        (LEAST(horas_extra_prom / 20.0, 1) * 30) +
-        (CASE WHEN anos_empresa < 1 THEN 30 WHEN anos_empresa < 2 THEN 15 ELSE 0 END)
-    , 1)                                                             AS indice_riesgo_fuga
-FROM metricas
-ORDER BY indice_riesgo_fuga DESC
+        COALESCE(ausentismo_norm, 0) * 30 + COALESCE(horas_extra_norm, 0) * 20
+        + COALESCE(antiguedad_inv_norm, 0) * 25 + COALESCE(desempeno_inv_norm, 0) * 25
+    , 1) AS indice_riesgo_fuga_0_100
+FROM normalizado
+ORDER BY indice_riesgo_fuga_0_100 DESC
 LIMIT 15;
         """,
     ),
 
-    # [KPI-35] Costo Estimado de Rotación
+    # [KPI-35] Costo Estimado de Rotación — factor de productividad perdida por nivel de
+    # cargo (nivel_orden: 1=C-Level más alto…6=Operativo más bajo), igual que
+    # k_turnover_cost en app/kpi_catalog.py. Antes este ejemplo usaba un factor fijo de
+    # 6 meses para todos los niveles, sin distinguir directivos de operativos.
     (
-        "¿Cuánto le costó a NovaTech la rotación de personal en el último año? (estimado 6 meses de salario por reemplazo)",
+        "¿Cuánto le costó a NovaTech la rotación de personal en el último año, considerando el nivel de cargo?",
         """
 SELECT
     r.tipo_retiro,
     r.departamento,
     COUNT(*)                                                 AS bajas,
     ROUND(AVG(pe.salario_actual))                           AS salario_promedio_cop,
-    ROUND(SUM(pe.salario_actual * 6))                       AS costo_rotacion_total_cop,
-    ROUND(AVG(pe.salario_actual * 6))                       AS costo_promedio_por_baja_cop
+    ROUND(SUM(pe.salario_actual * 12 * CASE pe.nivel_orden
+        WHEN 1 THEN 2.0 WHEN 2 THEN 2.0 WHEN 3 THEN 1.5
+        WHEN 4 THEN 1.25 WHEN 5 THEN 0.75 ELSE 0.6 END))       AS costo_rotacion_total_cop,
+    ROUND(AVG(pe.salario_actual * 12 * CASE pe.nivel_orden
+        WHEN 1 THEN 2.0 WHEN 2 THEN 2.0 WHEN 3 THEN 1.5
+        WHEN 4 THEN 1.25 WHEN 5 THEN 0.75 ELSE 0.6 END))       AS costo_promedio_por_baja_cop
 FROM v_rotacion_retiros r
 JOIN v_perfil_empleado pe ON pe.empleado_id = r.empleado_id
 WHERE r.fecha_retiro >= CURRENT_DATE - INTERVAL '12 months'
@@ -489,31 +511,75 @@ ORDER BY costo_rotacion_total_cop DESC;
         """,
     ),
 
-    # [KPI-43] Índice de Riesgo de Burnout
+    # [KPI-43] Índice de Riesgo de Burnout — score 0-100 POR EMPLEADO (el catálogo pide
+    # un score individual, no un promedio departamental), 4 señales normalizadas
+    # (min-max), pesos 30/20/25/25: horas extra, ausentismo, caída de desempeño entre
+    # las 2 últimas evaluaciones, y años en el cargo actual sin cambio/promoción (vía
+    # historial_cargos). Misma fórmula que k_burnout en app/kpi_catalog.py — antes este
+    # ejemplo agregaba por departamento con otros 3 inputs y otros pesos (40/40/20), sin
+    # relación con la fórmula real del catálogo.
     (
-        "¿Qué departamentos presentan mayor riesgo de burnout considerando horas extra, ausentismo y tardanzas?",
+        "¿Qué empleados tienen mayor riesgo de burnout considerando horas extra, ausentismo, caída de desempeño y tiempo en el cargo?",
         """
+WITH metricas AS (
+    SELECT
+        pe.empleado_id, pe.nombre_completo, pe.departamento, pe.sede,
+        COALESCE(AVG(am.total_horas_extra), 0) AS horas_extra_prom,
+        COALESCE(AVG(am.dias_ausencia), 0)     AS ausentismo_dias_prom,
+        GREATEST(COALESCE(evp.puntaje_total, ev.puntaje_total, 0) - COALESCE(ev.puntaje_total, 0), 0) AS caida_desempeno,
+        COALESCE(EXTRACT(YEAR FROM AGE(CURRENT_DATE, hc.fecha_inicio)), 0) AS anos_en_cargo
+    FROM v_perfil_empleado pe
+    LEFT JOIN v_asistencia_mensual am
+           ON am.empleado_id = pe.empleado_id
+          AND am.periodo >= CURRENT_DATE - INTERVAL '6 months'
+    LEFT JOIN LATERAL (
+        SELECT puntaje_total FROM v_evaluaciones_desempeno
+        WHERE empleado_id = pe.empleado_id ORDER BY periodo DESC LIMIT 1
+    ) ev ON TRUE
+    LEFT JOIN LATERAL (
+        SELECT puntaje_total FROM v_evaluaciones_desempeno
+        WHERE empleado_id = pe.empleado_id ORDER BY periodo DESC LIMIT 1 OFFSET 1
+    ) evp ON TRUE
+    LEFT JOIN LATERAL (
+        SELECT fecha_inicio FROM historial_cargos
+        WHERE empleado_id = pe.empleado_id AND fecha_fin IS NULL
+        ORDER BY fecha_inicio DESC LIMIT 1
+    ) hc ON TRUE
+    WHERE pe.estado_empleo = 'activo'
+    GROUP BY pe.empleado_id, pe.nombre_completo, pe.departamento, pe.sede,
+             ev.puntaje_total, evp.puntaje_total, hc.fecha_inicio
+),
+normalizado AS (
+    SELECT *,
+        (horas_extra_prom - MIN(horas_extra_prom) OVER()) /
+            NULLIF(MAX(horas_extra_prom) OVER() - MIN(horas_extra_prom) OVER(), 0)     AS horas_extra_norm,
+        (ausentismo_dias_prom - MIN(ausentismo_dias_prom) OVER()) /
+            NULLIF(MAX(ausentismo_dias_prom) OVER() - MIN(ausentismo_dias_prom) OVER(), 0) AS ausentismo_norm,
+        (caida_desempeno - MIN(caida_desempeno) OVER()) /
+            NULLIF(MAX(caida_desempeno) OVER() - MIN(caida_desempeno) OVER(), 0)        AS caida_desempeno_norm,
+        (anos_en_cargo - MIN(anos_en_cargo) OVER()) /
+            NULLIF(MAX(anos_en_cargo) OVER() - MIN(anos_en_cargo) OVER(), 0)            AS tiempo_cargo_norm
+    FROM metricas
+)
 SELECT
-    am.departamento,
-    am.sede,
-    ROUND(AVG(am.total_horas_extra), 1)                                    AS horas_extra_promedio,
-    ROUND(AVG(am.dias_ausencia::numeric / NULLIF(am.dias_habiles, 0)) * 100, 1) AS tasa_ausentismo_pct,
-    ROUND(AVG(am.tardanzas), 1)                                            AS tardanzas_promedio,
+    nombre_completo, departamento, sede,
     ROUND(
-        LEAST(AVG(am.total_horas_extra) / 25.0, 1) * 40 +
-        LEAST(AVG(am.dias_ausencia::numeric / NULLIF(am.dias_habiles, 0)) / 0.08, 1) * 40 +
-        LEAST(AVG(am.tardanzas) / 5.0, 1) * 20
-    , 1)                                                                   AS indice_burnout_0_100
-FROM v_asistencia_mensual am
-WHERE am.periodo >= CURRENT_DATE - INTERVAL '3 months'
-GROUP BY am.departamento, am.sede
-ORDER BY indice_burnout_0_100 DESC;
+        COALESCE(horas_extra_norm, 0) * 30 + COALESCE(ausentismo_norm, 0) * 20
+        + COALESCE(caida_desempeno_norm, 0) * 25 + COALESCE(tiempo_cargo_norm, 0) * 25
+    , 1) AS indice_burnout_0_100
+FROM normalizado
+ORDER BY indice_burnout_0_100 DESC
+LIMIT 15;
         """,
     ),
 
     # ── CLIMA LABORAL Y BIENESTAR ────────────────────────────────────────────
 
-    # [KPI-1] Índice de Compromiso del Empleado
+    # [KPI-1] Índice de Compromiso del Empleado — promedio de las 3 dimensiones reales
+    # disponibles (orgullo, recomendación, permanencia). El catálogo pide una 4ta
+    # dimensión, "esfuerzo discrecional", sin pregunta equivalente en la encuesta de
+    # NovaTech — no se sustituye por una señal sin relación (antes el tablero usaba
+    # equilibrio_vida como proxy de esfuerzo, incorrecto; ya corregido en kpi_catalog.py).
     (
         "¿Cuál es el índice de compromiso (engagement) de los empleados por sede y trimestre?",
         """
@@ -521,8 +587,7 @@ SELECT
     periodo,
     sede,
     ROUND(AVG(
-        (promedio_orgullo + promedio_satisfaccion + promedio_equilibrio +
-         promedio_desarrollo + promedio_retencion) / 5.0
+        (promedio_orgullo + promedio_enps_raw + promedio_retencion) / 3.0
     ), 2)                                     AS indice_engagement_0_10,
     SUM(respuestas)                           AS total_respuestas,
     ROUND(AVG(tasa_participacion), 1)         AS tasa_participacion_pct
@@ -563,7 +628,12 @@ ORDER BY h.año;
         """,
     ),
 
-    # [KPI-3] Índice de Bienestar
+    # [KPI-3] Índice de Bienestar — pesos Gallup del catálogo (físico 20%, mental+
+    # satisfacción 60% combinados en una sola señal, liderazgo 20%). La encuesta no
+    # separa "físico" de "mental": equilibrio_vida cubre D1(físico), satisfaccion_cargo
+    # cubre D2+D3 combinados, relacion_jefe cubre D4(liderazgo) — igual que en
+    # kpi_catalog.py (antes usaba orgullo_empresa mal etiquetado como "entorno" y nunca
+    # incluía satisfaccion_cargo).
     (
         "¿Cuál es el índice de bienestar laboral por sede y su evolución trimestral?",
         """
@@ -571,10 +641,9 @@ SELECT
     periodo,
     sede,
     ROUND(
-        (AVG(promedio_satisfaccion) * 0.25 +
-         AVG(promedio_equilibrio)   * 0.30 +
-         AVG(promedio_orgullo)      * 0.25 +
-         AVG(promedio_retencion)    * 0.20) / 10.0 * 100, 1
+        (AVG(promedio_equilibrio)      * 0.20 +
+         AVG(promedio_satisfaccion)    * 0.60 +
+         AVG(promedio_relacion_jefe)   * 0.20) / 10.0 * 100, 1
     )                                AS indice_bienestar_0_100,
     SUM(respuestas)                  AS empleados_respondieron
 FROM v_engagement_encuestas
@@ -676,24 +745,13 @@ ORDER BY am.periodo, costo_ausentismo_cop DESC;
         """,
     ),
 
-    # [KPI-18] Ratio de Errores en Nómina (simplificado — % meses con incidencias)
-    (
-        "¿Cuántos ciclos de nómina se procesaron correctamente por año?",
-        """
-SELECT
-    DATE_PART('year', periodo)::int          AS año,
-    COUNT(DISTINCT periodo)                  AS ciclos_procesados,
-    COUNT(DISTINCT empleado_id)              AS empleados_liquidados,
-    SUM(CASE WHEN salario_neto <= 0 THEN 1 ELSE 0 END) AS registros_con_anomalia,
-    ROUND(
-        (1 - SUM(CASE WHEN salario_neto <= 0 THEN 1.0 ELSE 0 END) /
-             NULLIF(COUNT(*), 0)) * 100, 2
-    )                                        AS tasa_puntualidad_pct
-FROM v_nomina_mensual
-GROUP BY 1
-ORDER BY 1;
-        """,
-    ),
+    # KPI-18 (Ratio de Errores en Nómina) sin ejemplo de entrenamiento a propósito: no
+    # hay ninguna tabla en NovaTech con un registro de errores/correcciones por corrida
+    # de nómina — v_nomina_mensual solo tiene los montos finales ya calculados. El
+    # ejemplo anterior usaba salario_neto<=0 como proxy de "error" (sin relación real
+    # con errores de nómina) y lo etiquetaba, por error de copy-paste, como
+    # "tasa_puntualidad_pct". Se quita en vez de seguir entrenando una fórmula inventada
+    # — ver la nota equivalente en app/kpi_catalog.py (@kpi registry, cerca de KPI-20).
 
     # [KPI-19] Tasa de Ocupación de Plazas (Vacancy Fill Rate)
     (
@@ -811,21 +869,12 @@ ORDER BY ratio_beneficios_pct DESC;
         """,
     ),
 
-    # [KPI-56] Puntualidad en el Pago de Nómina
-    (
-        "¿Cuántos ciclos de nómina se han procesado por año y cuál es la cobertura de empleados?",
-        """
-SELECT
-    DATE_PART('year', periodo)::int       AS año,
-    COUNT(DISTINCT periodo)               AS ciclos_de_nomina,
-    COUNT(DISTINCT empleado_id)           AS empleados_liquidados,
-    ROUND(AVG(salario_neto))              AS salario_neto_promedio_cop,
-    ROUND(SUM(costo_total_empresa))       AS costo_total_año_cop
-FROM v_nomina_mensual
-GROUP BY 1
-ORDER BY 1;
-        """,
-    ),
+    # KPI-56 (Puntualidad en el Pago de Nómina) sin ejemplo de entrenamiento a propósito:
+    # ninguna tabla de NovaTech registra fecha programada vs. fecha real de pago de
+    # nómina por ciclo — v_nomina_mensual solo tiene montos. El ejemplo anterior
+    # respondía una pregunta distinta (ciclos procesados y costo total) bajo la etiqueta
+    # de "puntualidad", lo que habría hecho que el chat contestara con un número que no
+    # mide puntualidad en absoluto. Ver la nota equivalente en app/kpi_catalog.py.
 
     # [KPI-57] Incremento Salarial Promedio
     (
@@ -1355,10 +1404,12 @@ def entrenar():
 
     print("Inicializando HRCopilot con ChromaDB…")
     print(f"  CHROMA_DIR: {CHROMA_DIR}")
+    # OJO: ChromaDB_VectorStore.__init__ (vanna instalado) lee config["path"], no
+    # "chroma_persist_directory" — ver la misma nota en app/dashboard.py.
     vn = HRCopilot(config={
-        "api_key":                  api_key,
-        "model":                    get_model_name(),
-        "chroma_persist_directory": CHROMA_DIR,
+        "api_key": api_key,
+        "model":   get_model_name(),
+        "path":    CHROMA_DIR,
     })
     print(f"  Modelo: {get_model_name()}")
 

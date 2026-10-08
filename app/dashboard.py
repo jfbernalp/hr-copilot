@@ -98,8 +98,12 @@ print("Inicializando HR Copilot — NovaTech Colombia…")
 def _make_copilot():
     """Usa ChromaDB por defecto (Hetzner tiene RAM suficiente).
     Fallback a modo estático si ChromaDB no está disponible."""
-    cfg = {"api_key": API_KEY, "model": get_model_name(),
-           "chroma_persist_directory": CHROMA_DIR}
+    # OJO: ChromaDB_VectorStore.__init__ (vanna instalado) lee config["path"], NO
+    # "chroma_persist_directory" — esa clave no existe en esta versión de la librería y
+    # se ignoraba en silencio, cayendo al default config.get("path", ".") = cwd. Por eso
+    # aparecían chroma.sqlite3 y carpetas UUID sueltas en la raíz del proyecto en vez de
+    # en chroma_db/: nunca se persistía donde pensábamos.
+    cfg = {"api_key": API_KEY, "model": get_model_name(), "path": CHROMA_DIR}
     print(f"  Modelo LLM: {cfg['model']} (configurable con LLM_MODEL en .env)")
     try:
         v = HRCopilot(config=cfg)

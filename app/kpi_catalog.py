@@ -52,7 +52,7 @@ SLUG_TO_CAT = {slug: cat for cat, _, slug in CATEGORY_ORDER}
 SUMMARY_KPIS = [25, 39, 15, 16, 5, 43, 20, 53]
 
 # KPIs que exponen cifras salariales → bloqueados si can_see_salary=False
-SALARY_KPIS = {17, 27, 35, 51, 53, 54, 55, 57, 58, 60, 70, 73}
+SALARY_KPIS = {17, 27, 35, 51, 53, 54, 55, 57, 58, 60, 67, 70, 73}
 
 _CATALOG = None
 
@@ -140,6 +140,11 @@ def build_context(conn, role_cfg: dict, filters=None) -> dict:
             COALESCE(ROUND(re.equilibrio_vida     * 3.0/10 + 1)::int, 3)  AS WorkLifeBalance,
             COALESCE(ROUND(re.oportunidades_desarrollo*3.0/10+1)::int, 3)  AS JobInvolvement,
             COALESCE(ROUND(ev.puntaje_total)::int, 3)                      AS PerformanceRating,
+            -- Caída de desempeño (KPI-43): diferencia entre el período de evaluación
+            -- anterior y el más reciente, solo cuando empeoró (negativo → 0).
+            GREATEST(COALESCE(evp.puntaje_total, ev.puntaje_total, 0) - COALESCE(ev.puntaje_total, 0), 0) AS PerfDrop,
+            -- Años en el cargo actual sin cambio/promoción (KPI-43), vía historial_cargos.
+            COALESCE(EXTRACT(YEAR FROM AGE(CURRENT_DATE, hc.fecha_inicio)), 0)             AS YearsInRole,
             -- OverTime derivado de asistencia (último mes disponible)
             CASE WHEN ot.total_horas_extra > 0 THEN 'Yes' ELSE 'No' END   AS OverTime
         FROM v_perfil_empleado pe
@@ -156,6 +161,16 @@ def build_context(conn, role_cfg: dict, filters=None) -> dict:
             WHERE empleado_id = pe.empleado_id
             ORDER BY periodo DESC LIMIT 1
         ) ev ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT puntaje_total FROM v_evaluaciones_desempeno
+            WHERE empleado_id = pe.empleado_id
+            ORDER BY periodo DESC LIMIT 1 OFFSET 1
+        ) evp ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT fecha_inicio FROM historial_cargos
+            WHERE empleado_id = pe.empleado_id AND fecha_fin IS NULL
+            ORDER BY fecha_inicio DESC LIMIT 1
+        ) hc ON TRUE
         LEFT JOIN LATERAL (
             SELECT total_horas_extra FROM v_asistencia_mensual
             WHERE empleado_id = pe.empleado_id
@@ -174,13 +189,15 @@ def build_context(conn, role_cfg: dict, filters=None) -> dict:
         "worklifebalance": "WorkLifeBalance",
         "jobinvolvement": "JobInvolvement",
         "performancerating": "PerformanceRating",
+        "perfdrop": "PerfDrop",
+        "yearsinrole": "YearsInRole",
         "overtime": "OverTime",
     })
     if emp.empty:
         emp = pd.DataFrame(columns=["employee_id","Gender","Attrition","Age","MonthlyIncome",
             "JobLevel","YearsAtCompany","department_name","role_name","sede",
             "JobSatisfaction","EnvironmentSatisfaction","RelationshipSatisfaction",
-            "WorkLifeBalance","JobInvolvement","PerformanceRating","OverTime"])
+            "WorkLifeBalance","JobInvolvement","PerformanceRating","PerfDrop","YearsInRole","OverTime"])
 
     if f["cargo"]:
         cargo_ids = _q(
@@ -277,7 +294,7 @@ def build_context(conn, role_cfg: dict, filters=None) -> dict:
                ce.periodo     AS cycle,
                re.orgullo_empresa                                          AS q_pride,
                re.recomendaria                                             AS q_recommend_nps,
-               re.equilibrio_vida                                          AS q_effort,
+               re.recomendaria                                             AS q_recommend_scaled,
                re.intencion_permanencia                                    AS q_stay,
                re.satisfaccion_cargo                                       AS q_satisfaction
         FROM respuestas_encuesta re
@@ -285,8 +302,10 @@ def build_context(conn, role_cfg: dict, filters=None) -> dict:
         WHERE re.empleado_id IN {_ids_clause(ids)}
     """)
     resp["dept"] = resp["employee_id"].map(dept_of)
-    # Escalar preguntas de engagement 0-10 → 1-5 (q_recommend_nps se deja en 0-10 para eNPS)
-    for col in ["q_pride", "q_effort", "q_stay", "q_satisfaction"]:
+    # Escalar preguntas 0-10 → 1-5 (q_recommend_nps se deja en 0-10, sin escalar, para el
+    # cálculo del eNPS; q_recommend_scaled es la misma pregunta pero en escala 1-5 para
+    # promediarla junto a las demás dimensiones de Engagement/Wellbeing).
+    for col in ["q_pride", "q_recommend_scaled", "q_stay", "q_satisfaction"]:
         if col in resp.columns:
             resp[col] = (resp[col] * 4.0 / 10.0 + 1).round().clip(1, 5).astype("Int64")
 
@@ -311,24 +330,54 @@ def build_context(conn, role_cfg: dict, filters=None) -> dict:
 
     # ── vacantes ──────────────────────────────────────────────────────────────
     vac = _q(f"""
-        SELECT vacante_id,
-               fecha_apertura::text  AS opened_date,
-               fecha_cierre::text    AS closed_date,
-               estado                AS status,
-               CASE fuente_contratacion
+        SELECT v.vacante_id,
+               v.fecha_apertura::text  AS opened_date,
+               v.fecha_cierre::text    AS closed_date,
+               v.estado                AS status,
+               CASE v.fuente_contratacion
                    WHEN 'interno' THEN 'internal' ELSE 'external'
-               END                   AS filled_by,
-               dias_abierta          AS days_to_fill,
-               nivel_cargo,
-               departamento,
-               sede,
-               salario_ofrecido      AS monthly_salary,
-               ofertas_extendidas    AS offers_extended,
-               1                     AS offers_accepted,
-               NULL::float           AS quality_of_hire,
-               0                     AS department_id,
-               0                     AS job_level
-        FROM v_vacantes_reclutamiento
+               END                     AS filled_by,
+               v.dias_abierta          AS days_to_fill,
+               v.nivel_cargo,
+               v.departamento,
+               v.sede,
+               v.salario_ofrecido      AS monthly_salary,
+               v.ofertas_extendidas    AS offers_extended,
+               1                       AS offers_accepted,
+               0                       AS department_id,
+               COALESCE(nc.orden, 4)   AS job_level,
+               -- Factor de productividad perdida 0.5x-2.0x por nivel (KPI-60): a
+               -- mayor nivel (orden 1=C-Level), mayor costo de oportunidad de la vacante.
+               CASE COALESCE(nc.orden, 4)
+                   WHEN 1 THEN 2.0 WHEN 2 THEN 1.5 WHEN 3 THEN 1.0
+                   WHEN 4 THEN 0.75 WHEN 5 THEN 0.6 ELSE 0.5
+               END                     AS productivity_factor,
+               -- Calidad de contratación (KPI-62): promedio de 2 señales reales
+               -- (desempeño en el primer año + retención a 1 año). El catálogo pide
+               -- un 3er componente, "evaluación del manager", sin fuente de datos en
+               -- este esquema — se omite en vez de fabricarlo. NULL hasta que haya
+               -- datos suficientes (sin 1ra evaluación, o <365 días de antigüedad).
+               qh.quality_of_hire
+        FROM v_vacantes_reclutamiento v
+        JOIN vacantes vb           ON vb.vacante_id = v.vacante_id
+        LEFT JOIN niveles_cargo nc ON nc.nombre      = v.nivel_cargo
+        LEFT JOIN LATERAL (
+            SELECT (
+                perf.puntaje_total / 5.0
+                + CASE
+                    WHEN e.fecha_retiro IS NOT NULL THEN
+                        CASE WHEN e.fecha_retiro - e.fecha_ingreso >= 365 THEN 1.0 ELSE 0.0 END
+                    WHEN CURRENT_DATE - e.fecha_ingreso >= 365 THEN 1.0
+                    ELSE NULL
+                  END
+            ) / 2.0 * 100 AS quality_of_hire
+            FROM empleados e
+            LEFT JOIN LATERAL (
+                SELECT puntaje_total FROM v_evaluaciones_desempeno
+                WHERE empleado_id = e.empleado_id ORDER BY periodo ASC LIMIT 1
+            ) perf ON TRUE
+            WHERE e.empleado_id = vb.empleado_contratado_id
+        ) qh ON TRUE
         WHERE 1=1 {sw}
     """)
     vac["dept"] = vac["departamento"]
@@ -406,20 +455,12 @@ def build_context(conn, role_cfg: dict, filters=None) -> dict:
         GROUP BY TO_CHAR(periodo,'YYYY-MM') ORDER BY 1
     """)
 
-    # ── payroll runs (stub — todos on-time) ───────────────────────────────────
-    runs = _q(f"""
-        SELECT DISTINCT TO_CHAR(periodo,'YYYY-MM') AS month,
-               1 AS on_time, 0 AS payslips_with_errors
-        FROM v_nomina_mensual
-        WHERE TO_CHAR(periodo,'YYYY-MM') IN ({m_arr})
-    """)
-
     last_month = months[-1] if months else "2026-08"
     return {
         "emp": emp, "dates": dates, "att": att, "pay": pay, "leaves": leaves,
         "hist": hist, "vac": vac, "cycles": cycles, "resp": resp, "sel_cycle": sel_cycle,
         "progs": progs, "parts": parts, "vacat": vacat,
-        "runs": runs, "bands": bands, "fin": fin, "pay_company": pay_company,
+        "bands": bands, "fin": fin, "pay_company": pay_company,
         "months": months, "last_month": last_month,
     }
 
@@ -508,11 +549,20 @@ def k_forecast(ctx):
     fx = np.arange(len(y) - 1, len(y) + 6)
     fy = np.polyval(coef, fx)
     fut = [f"{p}" for p in pd.period_range(h.index[-1], periods=7, freq="M")]
+    # Egresos esperados (uno de los 3 componentes del catálogo): headcount actual × tasa
+    # de rotación reciente — se muestra como contexto, no se resta de la tendencia porque
+    # la tendencia histórica ya refleja el efecto neto de la rotación pasada (restarla de
+    # nuevo duplicaría el efecto). "Ingresos planificados" (el 3er componente) no tiene
+    # fuente de datos en este esquema — no hay tabla de presupuesto/plan de contratación.
+    recent = ctx["hist"].tail(12)
+    rot = (recent["exits_voluntary"] + recent["exits_involuntary"]).sum() / max(recent["headcount"].sum(), 1)
+    egresos_esperados = y[-1] * rot
     fig = go.Figure()
     fig.add_scatter(x=list(h.index), y=y, mode="lines", name="Histórico", line=dict(color=DARK, width=2.5))
     fig.add_scatter(x=fut, y=fy, mode="lines+markers", name="Proyección",
                     line=dict(color=ORANGE, width=2.5, dash="dash"))
-    return _res(f"{fy[-1]:,.0f}", "empleados", "Proyección a 6 meses (tendencia lineal 18m)",
+    return _res(f"{fy[-1]:,.0f}", "empleados",
+                f"Tendencia lineal 18m · ~{egresos_esperados:.0f} egresos esperados/mes a la tasa de rotación actual · sin ingresos planificados (sin fuente de datos)",
                 fig=_theme(fig, legend=True))
 
 
@@ -534,6 +584,8 @@ def k_gender_pay(ctx):
 
 @kpi(28)   # Distribución Demográfica y Diversidad
 def k_diversity(ctx):
+    # El catálogo pide "segmento/headcount total" sin limitarse a género — se agrega
+    # la distribución por rango de edad como segunda dimensión (antes solo había género).
     e = ctx["emp"][ctx["emp"]["Attrition"] == "No"]
     d = e.groupby(["department_name", "Gender"]).size().unstack(fill_value=0)
     fig = go.Figure()
@@ -542,20 +594,27 @@ def k_diversity(ctx):
             fig.add_bar(y=[_short(i) for i in d.index], x=d[g], name=g, orientation="h", marker_color=color)
     fig.update_layout(barmode="stack")
     pf = 100 * (e["Gender"] == "Female").mean()
-    return _res(f"{pf:.0f}%", "mujeres", f"Edad promedio {e['Age'].mean():.0f} años · {len(e):,} activos",
+    age_brackets = pd.cut(e["Age"], [0, 30, 45, 200], labels=["<30", "30-45", ">45"])
+    age_mix = (100 * age_brackets.value_counts(normalize=True)).round(0)
+    age_txt = " · ".join(f"{b}: {age_mix.get(b, 0):.0f}%" for b in ["<30", "30-45", ">45"])
+    return _res(f"{pf:.0f}%", "mujeres", f"{age_txt} · {len(e):,} activos",
                 fig=_theme(fig, legend=True))
 
 
-@kpi(67)   # Vacation Liability — días de vacaciones pendientes
+@kpi(67)   # Vacation Liability — pasivo monetario de vacaciones pendientes
 def k_vacation(ctx):
     v = ctx["vacat"].copy()
-    v["dept"] = v["employee_id"].map(ctx["emp"].set_index("employee_id")["department_name"])
-    by = v.groupby("dept")["pending_days"].mean().sort_values()
-    fig = go.Figure(go.Bar(y=[_short(i) for i in by.index], x=by.round(1), orientation="h", marker_color=ORANGE))
-    fig.update_xaxes(title_text="días pendientes promedio", title_font_size=9)
-    total = int(v["pending_days"].sum())
+    e = ctx["emp"].set_index("employee_id")
+    v["dept"]   = v["employee_id"].map(e["department_name"])
+    v["income"] = v["employee_id"].map(e["MonthlyIncome"])
+    # Pasivo monetario (lo que pide el catálogo): días pendientes × salario diario.
+    v["liability"] = v["pending_days"] * v["income"] / 30.0
+    by = v.groupby("dept")["liability"].sum().sort_values()
+    fig = go.Figure(go.Bar(y=[_short(i) for i in by.index], x=by.round(0), orientation="h", marker_color=ORANGE))
+    fig.update_xaxes(title_text="pasivo acumulado (USD)", title_font_size=9)
+    total = v["liability"].sum()
     crit = int((v["pending_days"] > 30).sum())
-    return _res(f"{total:,}", "días acumulados", f"{crit} empleados con >30 días sin disfrutar",
+    return _res(_money(total), "pasivo acumulado", f"{crit} empleados con >30 días sin disfrutar",
                 status="warn" if crit > 20 else "ok", fig=_theme(fig, height=220))
 
 
@@ -595,8 +654,11 @@ def k_turnover_cost(ctx):
     e = ctx["emp"].set_index("employee_id")
     leavers["income"] = leavers["employee_id"].map(e["MonthlyIncome"])
     leavers["level"]  = leavers["employee_id"].map(e["JobLevel"])
-    factor = {1: 0.6, 2: 0.6, 3: 1.0, 4: 1.5, 5: 2.0}
-    leavers["cost"] = leavers["income"] * 12 * leavers["level"].map(factor)
+    # JobLevel = nivel_orden (1=C-Level más alto … 6=Operativo/Auxiliar más bajo). El factor
+    # debe ser MAYOR para los niveles más altos (200% directivos) y MENOR para operativos
+    # (50-75%), por catálogo — antes estaba invertido (1→0.6, 5→2.0) y le faltaba el nivel 6.
+    factor = {1: 2.0, 2: 2.0, 3: 1.5, 4: 1.25, 5: 0.75, 6: 0.6}
+    leavers["cost"] = leavers["income"] * 12 * leavers["level"].map(factor).fillna(1.0)
     by = leavers.groupby("dept").agg(cost=("cost", "sum"), n=("employee_id", "count")).sort_values("cost")
     fig = go.Figure(go.Bar(y=[_short(i) for i in by.index], x=by["cost"], orientation="h",
                            marker_color=RED, text=[f"{n} bajas" for n in by["n"]], textposition="inside"))
@@ -638,17 +700,33 @@ def k_turnover(ctx):
                 status="warn" if val > 12 else "ok", fig=_theme(fig, legend=True))
 
 
-@kpi(43)   # Burnout Risk Score
+@kpi(43)   # Burnout Risk Score — score 0-100 por empleado (fórmula real del catálogo)
 def k_burnout(ctx):
-    e = ctx["emp"][ctx["emp"]["Attrition"] == "No"]
-    risk = (e["OverTime"] == "Yes") & (e["WorkLifeBalance"] <= 2) & (e["JobSatisfaction"] <= 2)
-    by = (100 * risk.groupby(e["department_name"]).mean()).sort_values()
-    fig = go.Figure(go.Bar(y=[_short(i) for i in by.index], x=by.round(1), orientation="h",
-                           marker_color=[RED if v > 5 else ORANGE for v in by]))
-    fig.update_xaxes(title_text="% plantilla en riesgo", title_font_size=9)
-    val = 100 * risk.mean()
-    return _res(f"{val:.1f}%", "en riesgo", "Horas extra + bajo balance vida-trabajo + baja satisfacción",
-                status="bad" if val > 5 else ("warn" if val > 3 else "ok"), fig=_theme(fig, height=220))
+    # Score = 30% horas_extra_norm + 20% ausentismo_norm + 25% caída_desempeño_norm
+    #       + 25% tiempo_en_cargo_norm (todas normalizadas 0-1 sobre la plantilla activa).
+    # Mismo patrón que k_flight_risk (#34): top-15 priorizado, umbral crítico 70.
+    act = ctx["dates"][ctx["dates"]["exit_date"].isna()][["employee_id", "dept"]]
+    e = ctx["emp"].set_index("employee_id")
+    recent = ctx["att"][ctx["att"]["month"] >= ctx["months"][-min(6, len(ctx["months"]))]]
+    g = recent.groupby("employee_id").agg(absd=("absence_days", "mean"), ot=("overtime_hours", "mean"))
+    df = act.join(g, on="employee_id").dropna()
+    df["perf_drop"]   = df["employee_id"].map(e["PerfDrop"]).fillna(0)
+    df["tenure_role"] = df["employee_id"].map(e["YearsInRole"]).fillna(0)
+    df["score"] = (0.30 * _minmax(df["ot"]) + 0.20 * _minmax(df["absd"])
+                   + 0.25 * _minmax(df["perf_drop"]) + 0.25 * _minmax(df["tenure_role"])) * 100
+    df = df.sort_values("score", ascending=False)
+    top = df.head(15).iloc[::-1]
+    colors = [RED if s >= 70 else (AMBER if s >= 55 else DARK) for s in top["score"]]
+    fig = go.Figure(go.Bar(
+        y=[f"Emp #{i} · {_short(d)}" for i, d in zip(top["employee_id"], top["dept"])],
+        x=top["score"].round(1), orientation="h", marker_color=colors,
+        text=top["score"].round(0), textposition="outside"))
+    fig.add_vline(x=70, line_color=RED, line_dash="dash", annotation_text="riesgo alto", annotation_font_size=9)
+    fig.update_xaxes(range=[0, 105])
+    n_high = int((df["score"] >= 70).sum())
+    return _res(f"{n_high}", "en riesgo alto", "Score ≥70 — pesos: horas extra 30% · ausentismo 20% · caída desempeño 25% · tiempo en cargo 25%",
+                status="bad" if n_high > 25 else ("warn" if n_high > 0 else "ok"),
+                fig=_theme(fig, height=340))
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -693,6 +771,13 @@ def k_performance(ctx):
 
 @kpi(11)   # Tasa de Promoción Interna — dona
 def k_promotion(ctx):
+    # El catálogo pide específicamente vacantes de NIVEL SUPERIOR cubiertas con talento
+    # interno (ascensos), no toda contratación interna (que incluye movimientos laterales).
+    # No es posible distinguir ambos casos con los datos sintéticos actuales: las
+    # vacantes no registran qué empleado las cubrió (vacantes.empleado_contratado_id
+    # nunca se puebla al generar los datos — mismo gap que afecta KPI-62), así que no hay
+    # forma de comparar el nivel anterior del empleado contra el nivel de la vacante.
+    # Se reporta "contratación interna / total cubiertas" como la aproximación disponible.
     closed = ctx["vac"][ctx["vac"]["closed_date"].notna()]
     if closed.empty:
         return _empty()
@@ -711,10 +796,15 @@ def k_promotion(ctx):
 
 @kpi(1, wide=True)   # Engagement — barras apiladas 100% por pregunta (Likert)
 def k_engagement(ctx):
+    # El catálogo define 4 dimensiones (orgullo, recomendación, esfuerzo discrecional,
+    # permanencia) promediadas en partes iguales. La encuesta de NovaTech no tiene una
+    # pregunta de "esfuerzo discrecional" — se promedian las 3 dimensiones reales
+    # disponibles en vez de sustituirla por una señal sin relación (p. ej. balance
+    # vida-trabajo, que era el mapeo anterior, incorrecto).
     r = ctx["resp"][ctx["resp"]["cycle"] == ctx["sel_cycle"]]
     if r.empty:
         return _empty()
-    qs = [("q_pride", "Orgullo de pertenencia"), ("q_effort", "Esfuerzo discrecional"),
+    qs = [("q_pride", "Orgullo de pertenencia"), ("q_recommend_scaled", "Recomendaría la empresa"),
           ("q_stay", "Intención de permanencia")]
     fig = go.Figure()
     for level in [1, 2, 3, 4, 5]:
@@ -724,13 +814,16 @@ def k_engagement(ctx):
     fig.update_layout(barmode="stack")
     fig.update_xaxes(title_text="% de respuestas (1=muy en desacuerdo · 5=muy de acuerdo)", title_font_size=9)
     score = r[[q for q, _ in qs]].mean().mean()
-    return _res(f"{score:.2f}", "/ 5", f"Ciclo {r['cycle'].iloc[0]} · {len(r):,} respuestas",
+    return _res(f"{score:.2f}", "/ 5", f"Ciclo {r['cycle'].iloc[0]} · {len(r):,} respuestas · sin señal de esfuerzo discrecional en la encuesta",
                 status="ok" if score >= 3.4 else "warn", fig=_theme(fig, height=240, legend=True))
 
 
 @kpi(2, wide=True)   # Workplace Incident Rate — heatmap área × mes
 def k_incidents(ctx):
-    acc = ctx["leaves"][ctx["leaves"]["leave_type"].str.contains("Accidente")].copy()
+    # El catálogo pide incidentes de salud OCUPACIONAL — incluye tanto accidentes como
+    # enfermedad laboral ARL (ambos de origen laboral); antes el tablero solo contaba
+    # "Accidente" y excluía "Enfermedad Laboral", quedando por debajo del chat.
+    acc = ctx["leaves"][ctx["leaves"]["leave_type"].isin(["Accidente", "Enfermedad Laboral"])].copy()
     acc["month"] = acc["start_date"].str[:7]
     hours = ctx["att"].groupby(["dept", "month"]).apply(
         lambda g: g["regular_hours"].sum() + g["overtime_hours"].sum(), include_groups=False)
@@ -747,13 +840,20 @@ def k_incidents(ctx):
 
 @kpi(3)   # Wellbeing Index
 def k_wellbeing(ctx):
-    e = ctx["emp"][ctx["emp"]["Attrition"] == "No"]
-    score = e[["WorkLifeBalance", "EnvironmentSatisfaction", "RelationshipSatisfaction"]].mean(axis=1)
-    by = (100 * (score.groupby(e["department_name"]).mean() - 1) / 3).sort_values()
+    # El catálogo pide 4 dimensiones Gallup (físico 20%, mental 30%, satisfacción 30%,
+    # liderazgo 20%). La encuesta de NovaTech no separa "físico" de "mental" — se usa
+    # equilibrio_vida (WorkLifeBalance) como D1(físico), satisfaccion_cargo
+    # (JobSatisfaction) como proxy combinado de D2+D3 (pesos 0.30+0.30=0.60), y
+    # relacion_jefe (RelationshipSatisfaction) como D4(liderazgo). Antes el tablero
+    # usaba orgullo_empresa mal etiquetado como "entorno" y nunca incluía JobSatisfaction.
+    e = ctx["emp"][ctx["emp"]["Attrition"] == "No"].copy()
+    e["wellbeing_raw"] = (0.20 * e["WorkLifeBalance"] + 0.60 * e["JobSatisfaction"]
+                          + 0.20 * e["RelationshipSatisfaction"])
+    by = (100 * (e.groupby("department_name")["wellbeing_raw"].mean() - 1) / 3).sort_values()
     fig = go.Figure(go.Bar(y=[_short(i) for i in by.index], x=by.round(0), orientation="h", marker_color=BLUE))
     fig.update_xaxes(title_text="índice 0–100", title_font_size=9)
-    val = 100 * (score.mean() - 1) / 3
-    return _res(f"{val:.0f}", "/ 100", "Balance vida-trabajo + entorno + relaciones",
+    val = 100 * (e["wellbeing_raw"].mean() - 1) / 3
+    return _res(f"{val:.0f}", "/ 100", "Balance vida-trabajo 20% + satisfacción 60% + relación con jefe 20%",
                 status="ok" if val >= 55 else "warn", fig=_theme(fig, height=220))
 
 
@@ -828,25 +928,27 @@ def k_overtime(ctx):
 
 @kpi(17)   # Costo Total de Ausentismo (salarial)
 def k_abs_cost(ctx):
+    # Divisor de salario diario alineado a /30 (mismo criterio que el ejemplo de
+    # entrenamiento del chat, [KPI-17] en train_vanna_postgres.py — antes usaba /21.7,
+    # inconsistente entre chat y tablero). El catálogo pide sumar además un "costo de
+    # sustitución" (horas extra o personal temporal para cubrir la ausencia); no hay
+    # forma de atribuir ese costo específicamente a la cobertura de ausencias en los
+    # datos sintéticos actuales (el gasto de horas extra no se vincula a una ausencia
+    # puntual) — se documenta el componente faltante en vez de inventarlo.
     pay = ctx["pay"].set_index(["employee_id", "month"])["base_salary"]
     a = ctx["att"].set_index(["employee_id", "month"])
-    cost = (a["absence_days"] * (pay / 21.7)).groupby(level="month").sum()
+    cost = (a["absence_days"] * (pay / 30.0)).groupby(level="month").sum()
     fig = go.Figure(go.Bar(x=list(cost.index), y=cost.round(0), marker_color=RED))
     fig.update_yaxes(title_text="USD/mes", title_font_size=9)
-    return _res(_money(cost.tail(12).sum()), "últimos 12m", "Días de ausencia × costo diario salarial",
+    return _res(_money(cost.tail(12).sum()), "últimos 12m", "Días de ausencia × costo diario salarial (sin costo de sustitución, sin dato)",
                 fig=_theme(fig))
 
 
-@kpi(18)   # Payroll Error Rate
-def k_payroll_errors(ctx):
-    r = ctx["runs"]
-    rate = 100 * r["payslips_with_errors"] / r["payslips_total"]
-    fig = go.Figure(go.Scatter(x=r["month"], y=rate.round(2), mode="lines+markers",
-                               line=dict(color=DARK, width=2)))
-    fig.add_hline(y=1, line_color=RED, line_dash="dash", annotation_text="umbral 1%", annotation_font_size=9)
-    val = rate.mean()
-    return _res(f"{val:.2f}%", "promedio", f"{int(r['payslips_with_errors'].sum())} desprendibles con error en 24 meses",
-                status="ok" if val <= 1 else "warn", fig=_theme(fig))
+# KPI-18 (Payroll Error Rate) sin implementar: igual que KPI-56, no hay ninguna tabla
+# en NovaTech con un registro de errores por corrida de nómina (desprendibles
+# corregidos, re-procesados, etc.) — v_nomina_mensual solo tiene los montos finales
+# ya calculados, no un log de incidencias. La versión anterior leía
+# r["payslips_total"] de un stub que nunca definía esa columna (KeyError silencioso).
 
 
 @kpi(20)   # Time to Fill — barras por depto + benchmark 44 días
@@ -866,11 +968,15 @@ def k_time_to_fill(ctx):
 
 @kpi(19)   # Vacancy Fill Rate
 def k_fill_rate(ctx):
+    # El catálogo pide "plazas ocupadas / plazas AUTORIZADAS" (contra un presupuesto de
+    # dotación); el esquema no tiene ninguna tabla de plazas autorizadas/presupuesto de
+    # headcount, solo vacantes efectivamente abiertas. Se reporta cubiertas/abiertas como
+    # la aproximación disponible — documentado en vez de inventar un presupuesto.
     v = ctx["vac"].copy()
     if v.empty:
         return _empty()
     v["q"] = v["opened_date"].str[:7].map(_quarter)
-    by = v.groupby("q").agg(total=("vacancy_id", "count"),
+    by = v.groupby("q").agg(total=("vacante_id", "count"),
                             filled=("closed_date", lambda s: s.notna().sum()))
     by["rate"] = 100 * by["filled"] / by["total"]
     fig = go.Figure(go.Bar(x=list(by.index), y=by["rate"].round(0), marker_color=ORANGE,
@@ -887,7 +993,7 @@ def k_fill_rate(ctx):
 
 @kpi(51, wide=True)   # Compa-Ratio — dispersión con banda de equidad
 def k_compa(ctx):
-    e = ctx["emp"].merge(ctx["bands"], left_on="JobLevel", right_on="job_level")
+    e = ctx["emp"].merge(ctx["bands"], left_on="JobLevel", right_on="level")
     e["ratio"] = e["MonthlyIncome"] / e["band_mid"]
     jitter = np.random.default_rng(7).uniform(-0.18, 0.18, len(e))
     colors = np.where(e["ratio"] < 0.85, RED, np.where(e["ratio"] > 1.15, AMBER, DARK))
@@ -917,10 +1023,11 @@ def k_cost_fte(ctx):
 
 @kpi(54)   # Salario Medio por Área (salarial)
 def k_salary_dept(ctx):
-    by = ctx["emp"].groupby("department_name")["MonthlyIncome"].median().sort_values()
+    # La fórmula del catálogo pide el promedio (suma/conteo), no la mediana.
+    by = ctx["emp"].groupby("department_name")["MonthlyIncome"].mean().sort_values()
     fig = go.Figure(go.Bar(y=[_short(i) for i in by.index], x=by.round(0), orientation="h", marker_color=DARK))
-    fig.update_xaxes(title_text="mediana USD/mes", title_font_size=9)
-    return _res(_money(ctx["emp"]["MonthlyIncome"].median()), "mediana", "Salario base mensual por departamento",
+    fig.update_xaxes(title_text="promedio USD/mes", title_font_size=9)
+    return _res(_money(ctx["emp"]["MonthlyIncome"].mean()), "promedio", "Salario base mensual por departamento",
                 fig=_theme(fig, height=220))
 
 
@@ -969,20 +1076,20 @@ def k_cost_ratio(ctx):
                 status="ok" if val <= 35 else "bad", fig=_theme(fig))
 
 
-@kpi(56)   # Payroll On-Time Rate
-def k_ontime(ctx):
-    r = ctx["runs"].copy()
-    r["delay"] = (pd.to_datetime(r["actual_pay_date"]) - pd.to_datetime(r["scheduled_pay_date"])).dt.days
-    fig = go.Figure(go.Bar(x=r["month"], y=r["delay"],
-                           marker_color=[RED if d > 0 else LIGHT for d in r["delay"]]))
-    fig.update_yaxes(title_text="días de atraso", title_font_size=9)
-    val = 100 * (r["delay"] == 0).mean()
-    return _res(f"{val:.0f}%", "pagos puntuales", f"{int((r['delay'] > 0).sum())} meses con atraso en 24",
-                status="ok" if val >= 90 else "warn", fig=_theme(fig))
+# KPI-56 (Payroll On-Time Rate) sin implementar: el esquema de NovaTech no registra
+# fecha programada vs. fecha real de pago de nómina en ninguna tabla — v_nomina_mensual
+# solo tiene montos, no fechas de la corrida. Antes había aquí un stub hardcodeado a
+# "100% puntual" que además leía columnas inexistentes (KeyError silencioso). Se quita:
+# si se quiere este KPI de verdad, hace falta una tabla de corridas de nómina con
+# fecha_programada/fecha_real por ciclo (cambio de esquema + reseed, fuera de este fix).
 
 
 @kpi(73)   # Revenue per Labor Cost (salarial — toda la compañía)
 def k_revenue_ratio(ctx):
+    # El catálogo pide este ratio por unidad de negocio; financials_empresa solo registra
+    # ingresos a nivel de toda la compañía (no hay desagregación por departamento/unidad
+    # en ningún lugar del esquema). Se calcula a nivel compañía — documentado aquí en vez
+    # de fabricar una desagregación que no existe en los datos.
     p = ctx["pay_company"].set_index("month")["total_cost"]
     f = ctx["fin"].set_index("month")["operating_revenue"]
     ratio = (f / p).dropna()
@@ -1065,7 +1172,7 @@ def k_cost_vacancy(ctx):
     v["cost"] = v["monthly_salary"] * v["productivity_factor"] * v["months_open"]
     v = v.sort_values("cost").tail(10)
     fig = go.Figure(go.Bar(
-        y=[f"V{i:03d} · {_short(d)} · Nivel {l}" for i, d, l in zip(v["vacancy_id"], v["dept"], v["job_level"])],
+        y=[f"V{i:03d} · {_short(d)} · Nivel {l}" for i, d, l in zip(v["vacante_id"], v["dept"], v["job_level"])],
         x=v["cost"].round(0), orientation="h",
         marker_color=[RED if c > 50_000 else ORANGE for c in v["cost"]]))
     fig.update_xaxes(title_text="USD acumulado desde apertura", title_font_size=9)
@@ -1092,9 +1199,13 @@ def k_offer_acceptance(ctx):
 
 @kpi(62)   # Quality of Hire — barras por cohorte trimestral
 def k_quality_hire(ctx):
+    # quality_of_hire se calcula en build_context() a partir de vacantes.empleado_contratado_id
+    # (desempeño primer año + retención a 1 año). Dato sintético actual: ese campo nunca se
+    # pobló al generar las vacantes (0/45 con valor) — hasta que setup/seed_postgres.py lo
+    # llene, este KPI queda sin datos reales por diseño del dataset, no por un bug de cálculo.
     v = ctx["vac"][(ctx["vac"]["closed_date"].notna()) & (ctx["vac"]["quality_of_hire"].notna())].copy()
     if v.empty:
-        return _empty()
+        return _empty("Sin datos: las vacantes sintéticas no registran qué empleado las cubrió")
     v["q"] = v["closed_date"].str[:7].map(_quarter)
     by = v.groupby("q")["quality_of_hire"].mean()
     fig = go.Figure(go.Bar(x=list(by.index), y=by.round(1), marker_color=ORANGE))
