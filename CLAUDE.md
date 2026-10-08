@@ -261,9 +261,9 @@ de regresión.
 | Error | Causa | Solución |
 |---|---|---|
 | Gráficos caen al heurístico `smart_chart` en vez del tipo que recomienda Gemini | **Bug real, corregido** (commit `bc90173`): `_generate_chart_code()` llamaba a `genai.types.*` sin tener `genai` importado a nivel de módulo en `app/dashboard.py` | Ya corregido — import agregado al inicio del archivo |
-| ChromaDB vacío al arrancar el dashboard | Ruta relativa en vez de absoluta | Siempre `os.path.join(BASE_DIR, "chroma_db")` |
+| ChromaDB nunca persistía en `chroma_db/` — siempre caía al directorio de trabajo actual (archivos sueltos `chroma.sqlite3` + carpetas UUID en la raíz del repo, o en `/app` dentro del contenedor) | **Bug real, corregido** (commit `948cddc`): `ChromaDB_VectorStore.__init__` del `vanna` instalado lee `config["path"]`, no `config["chroma_persist_directory"]` — esa clave no existe en esta versión de la librería y se ignoraba en silencio | Usar siempre `"path": CHROMA_DIR` en el config de `HRCopilot`/`_StaticCopilot` (`app/dashboard.py`, `setup/train_vanna_postgres.py`) — nunca `"chroma_persist_directory"` |
 | `PermissionError` en dashboard | RLS bloqueó la query (rol sin acceso a salarios, o fuera de su sede) | Esperado — mostrar al usuario, no es bug |
-| 429 / `RESOURCE_EXHAUSTED` de Gemini | Cuota de la API — `llm_provider.py` reintenta con backoff (hasta 3 veces) | Si persiste tras los reintentos, revisar cuota en AI Studio / facturación |
+| 429 / `RESOURCE_EXHAUSTED` de Gemini, `quotaId: ...FreeTier, limit: 20` | El proyecto Google Cloud está en el **tier gratuito** para `gemini-3.6-flash` (20 solicitudes/día), no en un plan con facturación activa como se creía — confirmado en el mensaje de error del 8 oct 2026. `llm_provider.py` reintenta con backoff, pero no sirve de nada si ya se agotó la cuota diaria completa | **Acción pendiente de Juan**: activar facturación para `gemini-3.6-flash` específicamente en el proyecto de Google Cloud/AI Studio que usa `GOOGLE_API_KEY`/`GEMINI_API_KEY` — revisar que no sea un proyecto distinto al que se verificó como "Nivel 1" |
 | `vanna[google]` falla en zsh | El shell interpreta los corchetes | Usar comillas: `pip install 'vanna[google]'` |
 
 **Corregido 2026-10-08** (commit `f9254b0`): `_generate_chart_code()` mandaba
@@ -275,6 +275,16 @@ endpoint de Gemini. Se quitó la muestra de filas; el prompt ahora manda solo
 individuales). Guardia permanente: `tests/test_no_raw_data_leak.py` (sin
 costo, no llama a Gemini) — falla si cualquier valor real de celda aparece en
 el prompt capturado. Ver la convención correspondiente más abajo.
+
+**Fidelidad de fórmulas de KPI** (8 oct 2026, commit `948cddc` — ver Fase 8 en
+`ROADMAP.md` para el detalle completo): auditoría de las 41 KPIs del catálogo
+contra el chat y el tablero encontró 14 con discrepancia real (chat y tablero
+calculando cosas distintas, o ninguno igualando la fórmula oficial) y 4 bugs de
+código (`KeyError` silencioso, atrapado por el `try/except` genérico de
+`_build_items` en `app/kpi_catalog.py` — por eso una tarjeta puede "no mostrar
+nada útil" sin lanzar un error visible). Si una KPI del catálogo se ve rara en
+el chat o en `/kpis`, antes de asumir que es un caso nuevo, revisar si ya está
+en la tabla de auditoría de esa fase.
 
 **Pendiente de verificar** (no bloqueante): confirmar con Juan si
 `gemini-3.6-flash` (default en `setup/llm_provider.py`, usado también en
