@@ -266,6 +266,16 @@ de regresión.
 | 429 / `RESOURCE_EXHAUSTED` de Gemini | Cuota de la API — `llm_provider.py` reintenta con backoff (hasta 3 veces) | Si persiste tras los reintentos, revisar cuota en AI Studio / facturación |
 | `vanna[google]` falla en zsh | El shell interpreta los corchetes | Usar comillas: `pip install 'vanna[google]'` |
 
+**Corregido 2026-10-08** (commit `f9254b0`): `_generate_chart_code()` mandaba
+`df.head(5).to_string()` a Gemini para decidir el tipo de gráfico — como
+`v_perfil_empleado` devuelve `nombre_completo` + `salario_actual` en la misma
+fila, preguntas normales filtraban nombres y salarios reales de empleados al
+endpoint de Gemini. Se quitó la muestra de filas; el prompt ahora manda solo
+`shape`, `dtypes` y cardinalidad categórica (agregados, nunca valores
+individuales). Guardia permanente: `tests/test_no_raw_data_leak.py` (sin
+costo, no llama a Gemini) — falla si cualquier valor real de celda aparece en
+el prompt capturado. Ver la convención correspondiente más abajo.
+
 **Pendiente de verificar** (no bloqueante): confirmar con Juan si
 `gemini-3.6-flash` (default en `setup/llm_provider.py`, usado también en
 `train_vanna_postgres.py`) sigue siendo el modelo correcto/más reciente
@@ -326,6 +336,15 @@ Ver sección "Dónde vive el código real" arriba.
 - Vanna/ChromaDB se entrenan y consultan **solo contra las 9 vistas
   semánticas**, nunca contra las tablas base — si se agrega una tabla nueva,
   agregar también su vista correspondiente antes de entrenar.
+- **Ningún valor real de celda viaja a un LLM, nunca** — solo metadatos
+  agregados (shape, dtypes, cardinalidad, rangos). Varias vistas devuelven
+  PII y salario en la misma fila (`v_perfil_empleado`, `v_nomina_mensual`),
+  así que cualquier código nuevo que arme un prompt con contenido de un
+  DataFrame (ej. una función de resumen o detección de anomalías) debe
+  seguir el patrón de `_generate_chart_code()` en `app/dashboard.py` — nunca
+  `df.head()`/`.to_string()`/muestras de filas hacia el LLM. Si se necesita
+  "forma" de los datos, usar una fila sintética generada desde los dtypes,
+  nunca datos reales. `tests/test_no_raw_data_leak.py` es el guardia de esto.
 
 ---
 

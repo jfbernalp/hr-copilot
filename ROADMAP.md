@@ -81,12 +81,37 @@ sobre la BD real de Midasoft.*
 - [ ] Pendiente: decidir si vale la pena portar alguno de los ~59 ejemplos
       pregunta→SQL de la Gen 1 que no tengan equivalente entre los ~56 de NovaTech.
 
+## Fase 7 — Hardening de seguridad: datos sensibles vs. LLM ✅ COMPLETA (8 oct 2026)
+*Disparado por una revisión de estándares de la industria para mandar datos
+sensibles a un LLM (Claude/Gemini) sin comprometer la seguridad de los datos
+ni la integridad de la BD — el principio: el LLM solo ve metadatos, nunca
+datos reales.*
+
+- [x] **Encontrado y corregido** (`f9254b0`): `_generate_chart_code()` en
+      `app/dashboard.py` mandaba `df.head(5).to_string()` a Gemini para elegir
+      el tipo de gráfico. `v_perfil_empleado` devuelve `nombre_completo` +
+      `salario_actual` en la misma fila → preguntas normales ("salario vs años
+      en la empresa") mandaban nombres y salarios reales al endpoint de
+      Gemini. Se quitó la muestra de filas; el prompt conserva solo `shape`,
+      `dtypes` y cardinalidad categórica (agregados).
+- [x] Guardia permanente agregada: `tests/test_no_raw_data_leak.py` — DataFrame
+      con valores centinela únicos, falla si cualquiera aparece en el prompt
+      capturado. Sin costo (no llama a Gemini de verdad).
+- [x] Verificado sin regresión: `tests/ai_regression.py` en producción post-
+      deploy → 14/14 SQL ejecutable, 12/14 (86%) gráfico correcto, 0
+      violaciones de paleta (gate: ≥75%).
+- [x] Desplegado: rebuild + redeploy de `hr-copilot-hr-app-1` en Hetzner,
+      HTTP 200 confirmado, ChromaDB reentrenado (56/56 ejemplos).
+- [x] Convención documentada en `CLAUDE.md` ("Convenciones de código"): ningún
+      valor real de celda viaja a un LLM, nunca — cualquier código nuevo que
+      arme un prompt con contenido de un DataFrame debe seguir este patrón.
+
 ---
 
-## Resultado de regresión más reciente (30 sept 2026, post-fix del bug de gráficos)
+## Resultado de regresión más reciente (8 oct 2026, post-fix de fuga de datos a Gemini)
 
 ```
-SQL ejecutable: 14/14 | Gráfico correcto: ver corrida post-redeploy | Violaciones de paleta: 0
+SQL ejecutable: 14/14 | Gráfico correcto: 12/14 (86%) | Violaciones de paleta: 0
 ```
 
 ## Decisión clave tomada (Gen 1, sigue vigente como principio)
